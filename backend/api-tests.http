@@ -1,0 +1,29 @@
+### API Testing for ChronoDesk
+# If you are using VS Code, you can install the "REST Client" extension 
+# to run these requests directly from this file by clicking "Send Request".
+
+@baseUrl = http://localhost:5000/api
+
+### 1. Register a new user
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 2. Login to get a token
+# @name loginRequest
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 3. Example of an authenticated request (for future use)
+# GET {{baseUrl}}/workspace
+# Authorization: Bearer {{loginRequest.response.body.token}}
