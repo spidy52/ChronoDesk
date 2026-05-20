@@ -1,49 +1,120 @@
-import { useState } from 'react';
+import {
+  useState,
+  useEffect,
+} from 'react';
 
 import WorkspaceDock from './components/WorkspaceDock';
+
 import Sidebar from './components/Sidebar';
+
 import TopBar from './components/TopBar';
+
 import KanbanBoard from './components/KanbanBoard';
 
 export default function DashboardPage() {
+  /* ================= SIDEBAR ================= */
+
   const [sidebarOpen, setSidebarOpen] =
-    useState(true);
+    useState(() => {
+      const saved =
+        localStorage.getItem(
+          'sidebarOpen'
+        );
 
-  const [boardView, setBoardView] = useState<
-    'list' | 'grid' | 'kanban'
-  >('kanban');
+      return saved !== null
+        ? JSON.parse(saved)
+        : true;
+    });
 
-  const [activeFilter, setActiveFilter] =
-    useState<string | null>(null);
+  /* ================= PERSIST SIDEBAR ================= */
+
+  useEffect(() => {
+    localStorage.setItem(
+      'sidebarOpen',
+      JSON.stringify(
+        sidebarOpen
+      )
+    );
+  }, [sidebarOpen]);
+
+  /* ================= BOARD VIEW ================= */
+
+  const [boardView, setBoardView] =
+    useState<
+      'list' | 'grid' | 'kanban'
+    >('kanban');
+
+  /* ================= FILTER ================= */
+
+  const [
+    activeFilter,
+    setActiveFilter,
+  ] = useState<string | null>(
+    null
+  );
+
+  /* ================= SEARCH ================= */
+
+  const [
+    searchTerm,
+    setSearchTerm,
+  ] = useState('');
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground relative">
 
-      {/* Workspace Dock */}
+      {/* ================= WORKSPACE DOCK ================= */}
+
       <WorkspaceDock />
 
-      {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} />
+      {/* ================= SIDEBAR ================= */}
 
-      {/* Main Content */}
+      <Sidebar
+        isOpen={sidebarOpen}
+      />
+
+      {/* ================= MAIN CONTENT ================= */}
+
       <div className="flex flex-col flex-1 overflow-hidden">
 
-        {/* Top Bar */}
+        {/* ================= TOPBAR ================= */}
+
         <TopBar
           boardView={boardView}
-          setBoardView={setBoardView}
-          activeFilter={activeFilter}
-          setActiveFilter={setActiveFilter}
+          setBoardView={
+            setBoardView
+          }
+          activeFilter={
+            activeFilter
+          }
+          setActiveFilter={
+            setActiveFilter
+          }
+          searchTerm={
+            searchTerm
+          }
+          setSearchTerm={
+            setSearchTerm
+          }
           onToggleSidebar={() =>
-            setSidebarOpen(!sidebarOpen)
+            setSidebarOpen(
+              !sidebarOpen
+            )
           }
         />
 
-        {/* Board */}
+        {/* ================= BOARD ================= */}
+
         <div className="flex-1 overflow-hidden">
+
           <KanbanBoard
             boardView={boardView}
-            activeFilter={activeFilter}
+            activeFilter={
+              activeFilter
+            }
+            searchTerm={
+              searchTerm
+            }
           />
         </div>
       </div>

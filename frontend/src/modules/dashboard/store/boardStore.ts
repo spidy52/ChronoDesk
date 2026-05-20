@@ -23,18 +23,11 @@ interface BoardState {
 
 // Initial Mock Data
 const initialTasks: Record<string, Task> = {
-  'task-1': { id: 'task-1', title: 'Upcoming Project', description: 'View competitors and similar projects...', tags: [{ label: 'Marketing', color: 'pink' }, { label: 'Sales', color: 'green' }], date: 'Today', assignees: ['https://i.pravatar.cc/150?u=4'] },
-  'task-2': { id: 'task-2', title: 'Advertising Company', description: 'Prepare references for the advertising campaign...', tags: [{ label: 'Marketing', color: 'pink' }], date: '29 March', assignees: ['https://i.pravatar.cc/150?u=6'] },
-  'task-3': { id: 'task-3', title: 'Moodboard', description: 'It is a long established fact that a reader will be distracted...', image: 'https://images.unsplash.com/photo-1618761714954-0b8cd0026356?auto=format&fit=crop&w=400&q=80', tags: [{ label: 'Design', color: 'blue' }], date: 'Tomorrow', assignees: ['https://i.pravatar.cc/150?u=7'] },
-  'task-4': { id: 'task-4', title: 'Design Analysis', description: 'Check the design for paddings and how new NFTs are loaded.', tags: [{ label: 'Sales', color: 'green' }], date: '28 March', assignees: ['https://i.pravatar.cc/150?u=10'] },
-  'task-5': { id: 'task-5', title: 'Bank Card Registration', description: 'Design own payments form our site using Elements UI.', image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&w=400&q=80', tags: [{ label: 'Design', color: 'blue' }, { label: 'Coding', color: 'orange' }], date: '28 March', assignees: ['https://i.pravatar.cc/150?u=15'] },
+
 };
 
 const initialColumns: Record<string, Column> = {
-  'col-1': { id: 'col-1', title: 'Research', taskIds: ['task-1', 'task-2'] },
-  'col-2': { id: 'col-2', title: 'Design', taskIds: ['task-3'] },
-  'col-3': { id: 'col-3', title: 'In Review', taskIds: ['task-4'] },
-  'col-4': { id: 'col-4', title: 'Development', taskIds: ['task-5'] },
+
 };
 
 export const useBoardStore = create<BoardState>((set) => ({

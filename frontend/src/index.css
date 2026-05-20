@@ -106,3 +106,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ================= HIDE SCROLLBAR ================= */
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { useState } from 'react';
+
 import { useNavigate } from 'react-router-dom';
 
 import { useAuthStore } from '../../auth/store';
@@ -25,6 +26,8 @@ export default function TopBar({
   setBoardView,
   activeFilter,
   setActiveFilter,
+  searchTerm,
+  setSearchTerm,
 }: {
   onToggleSidebar: () => void;
 
@@ -41,17 +44,23 @@ export default function TopBar({
   setActiveFilter: React.Dispatch<
     React.SetStateAction<string | null>
   >;
+
+  searchTerm: string;
+
+  setSearchTerm: React.Dispatch<
+    React.SetStateAction<string>
+  >;
 }) {
-  const { user, logout } = useAuthStore();
+  const { user, logout } =
+    useAuthStore();
 
   const navigate = useNavigate();
 
-  /* ---------------- DROPDOWN CONTROL ---------------- */
+  /* ================= DROPDOWN CONTROL ================= */
 
   const [activeDropdown, setActiveDropdown] =
     useState<
       | 'notifications'
-      | 'messages'
       | 'profile'
       | 'filters'
       | null
@@ -60,10 +69,12 @@ export default function TopBar({
   return (
     <div className="relative flex items-center justify-between px-8 py-6 border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-40">
 
-      {/* LEFT */}
+      {/* ================= LEFT ================= */}
+
       <div className="flex items-center gap-5">
 
         {/* SIDEBAR TOGGLE */}
+
         <button
           onClick={onToggleSidebar}
           className="w-11 h-11 rounded-2xl border bg-card flex items-center justify-center hover:bg-secondary transition-all"
@@ -72,13 +83,15 @@ export default function TopBar({
         </button>
 
         {/* TITLE */}
+
         <h1 className="text-3xl font-bold tracking-tight">
+
           Tasks Board
         </h1>
 
         {/* SEARCH */}
-        <div className="hidden xl:flex items-center bg-card border rounded-2xl px-4 py-3 w-[320px]">
 
+        <div className="hidden md:flex items-center bg-card border rounded-2xl px-4 py-3 w-[260px] lg:w-[320px]">
           <Search
             size={18}
             className="text-muted-foreground mr-3"
@@ -87,70 +100,36 @@ export default function TopBar({
           <input
             type="text"
             placeholder="Search tasks..."
+            value={searchTerm}
+            onChange={(e) =>
+              setSearchTerm(
+                e.target.value
+              )
+            }
             className="bg-transparent outline-none text-sm flex-1"
           />
         </div>
       </div>
 
-      {/* RIGHT */}
+      {/* ================= RIGHT ================= */}
+
       <div className="flex items-center gap-4">
 
-        {/* ================= MESSAGES ================= */}
-        <div className="relative">
+        {/* ================= CHAT PAGE ================= */}
 
-          <button
-            onClick={() =>
-              setActiveDropdown(
-                activeDropdown === 'messages'
-                  ? null
-                  : 'messages'
-              )
-            }
-            className="w-11 h-11 rounded-full border bg-card flex items-center justify-center hover:bg-secondary transition-all"
-          >
-            <Mail size={18} />
-          </button>
-
-          {activeDropdown === 'messages' && (
-            <div className="absolute right-0 top-14 w-80 bg-card border rounded-3xl shadow-2xl p-4 z-50">
-
-              <div className="flex items-center justify-between mb-4">
-
-                <h3 className="font-bold text-lg">
-                  Messages
-                </h3>
-
-                <button
-                  onClick={() =>
-                    setActiveDropdown(null)
-                  }
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-3">
-
-                <MessageItem
-                  name="Alex"
-                  message="Task completed successfully."
-                />
-
-                <MessageItem
-                  name="Sarah"
-                  message="Need design review."
-                />
-
-                <MessageItem
-                  name="Michael"
-                  message="Meeting at 5 PM."
-                />
-              </div>
-            </div>
-          )}
-        </div>
+        <button
+          onClick={() =>
+            navigate(
+              '/dashboard/chats'
+            )
+          }
+          className="w-11 h-11 rounded-full border bg-card flex items-center justify-center hover:bg-secondary transition-all"
+        >
+          <Mail size={18} />
+        </button>
 
         {/* ================= NOTIFICATIONS ================= */}
+
         <div className="relative">
 
           <button
@@ -177,12 +156,15 @@ export default function TopBar({
               <div className="flex items-center justify-between mb-4">
 
                 <h3 className="font-bold text-lg">
+
                   Notifications
                 </h3>
 
                 <button
                   onClick={() =>
-                    setActiveDropdown(null)
+                    setActiveDropdown(
+                      null
+                    )
                   }
                 >
                   <X size={18} />
@@ -193,7 +175,7 @@ export default function TopBar({
 
                 <NotificationItem
                   title="Task moved"
-                  description="Ravi moved a task to Design"
+                  description="Task moved to completed"
                 />
 
                 <NotificationItem
@@ -211,12 +193,14 @@ export default function TopBar({
         </div>
 
         {/* ================= PROFILE ================= */}
+
         <div className="relative">
 
           <button
             onClick={() =>
               setActiveDropdown(
-                activeDropdown === 'profile'
+                activeDropdown ===
+                  'profile'
                   ? null
                   : 'profile'
               )
@@ -226,38 +210,67 @@ export default function TopBar({
 
             <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
 
-              {user?.name?.charAt(0) ||
-                user?.email?.charAt(0) ||
+              {user?.name?.charAt(
+                0
+              ) ||
+                user?.email?.charAt(
+                  0
+                ) ||
                 'U'}
             </div>
 
             <span className="font-medium text-sm">
-              {user?.name || 'User'}
+
+              {user?.name ||
+                'User'}
             </span>
 
-            <ChevronDown size={16} />
+            <ChevronDown
+              size={16}
+            />
           </button>
 
-          {activeDropdown === 'profile' && (
+          {activeDropdown ===
+            'profile' && (
             <div className="absolute right-0 top-14 w-60 bg-card border rounded-3xl shadow-2xl p-2 z-50">
 
               <ProfileButton
-                icon={<User size={18} />}
+                icon={
+                  <User
+                    size={18}
+                  />
+                }
                 label="Profile"
               />
 
               <ProfileButton
-                icon={<Settings size={18} />}
+                icon={
+                  <Settings
+                    size={18}
+                  />
+                }
                 label="Settings"
+                onClick={() =>
+                  navigate(
+                    '/dashboard/settings'
+                  )
+                }
               />
 
               <ProfileButton
-                icon={<LogOut size={18} />}
+                icon={
+                  <LogOut
+                    size={18}
+                  />
+                }
                 label="Logout"
                 danger
                 onClick={() => {
                   logout();
-                  navigate('/login');
+
+                  navigate(
+                    '/login'
+                  );
                 }}
               />
             </div>
@@ -265,12 +278,14 @@ export default function TopBar({
         </div>
 
         {/* ================= FILTERS ================= */}
+
         <div className="relative">
 
           <button
             onClick={() =>
               setActiveDropdown(
-                activeDropdown === 'filters'
+                activeDropdown ===
+                  'filters'
                   ? null
                   : 'filters'
               )
@@ -283,36 +298,40 @@ export default function TopBar({
             <Filter size={16} />
           </button>
 
-          {activeDropdown === 'filters' && (
+          {activeDropdown ===
+            'filters' && (
             <div className="absolute top-14 right-0 bg-card border rounded-2xl shadow-2xl p-3 w-52 z-50">
 
               {[
-                'Marketing',
-                'Design',
-                'Sales',
-                'Coding',
-              ].map((tag) => (
+                'low',
+                'medium',
+                'high',
+              ].map((priority) => (
                 <button
-                  key={tag}
+                  key={priority}
                   onClick={() => {
                     setActiveFilter(
-                      activeFilter === tag
+                      activeFilter ===
+                        priority
                         ? null
-                        : tag
+                        : priority
                     );
 
-                    setActiveDropdown(null);
+                    setActiveDropdown(
+                      null
+                    );
                   }}
                   className={`
                     w-full text-left px-4 py-3 rounded-xl text-sm transition-all
                     ${
-                      activeFilter === tag
+                      activeFilter ===
+                      priority
                         ? 'bg-primary text-primary-foreground'
                         : 'hover:bg-secondary'
                     }
                   `}
                 >
-                  {tag}
+                  {priority}
                 </button>
               ))}
             </div>
@@ -320,30 +339,58 @@ export default function TopBar({
         </div>
 
         {/* ================= VIEW SWITCHER ================= */}
+
         <div className="flex items-center bg-secondary p-1 rounded-2xl">
 
           <ViewButton
-            active={boardView === 'list'}
-            onClick={() =>
-              setBoardView('list')
+            active={
+              boardView ===
+              'list'
             }
-            icon={<List size={18} />}
+            onClick={() =>
+              setBoardView(
+                'list'
+              )
+            }
+            icon={
+              <List
+                size={18}
+              />
+            }
           />
 
           <ViewButton
-            active={boardView === 'grid'}
-            onClick={() =>
-              setBoardView('grid')
+            active={
+              boardView ===
+              'grid'
             }
-            icon={<LayoutGrid size={18} />}
+            onClick={() =>
+              setBoardView(
+                'grid'
+              )
+            }
+            icon={
+              <LayoutGrid
+                size={18}
+              />
+            }
           />
 
           <ViewButton
-            active={boardView === 'kanban'}
-            onClick={() =>
-              setBoardView('kanban')
+            active={
+              boardView ===
+              'kanban'
             }
-            icon={<Columns size={18} />}
+            onClick={() =>
+              setBoardView(
+                'kanban'
+              )
+            }
+            icon={
+              <Columns
+                size={18}
+              />
+            }
           />
         </div>
       </div>
@@ -351,7 +398,7 @@ export default function TopBar({
   );
 }
 
-/* ================= COMPONENTS ================= */
+/* ================= VIEW BUTTON ================= */
 
 function ViewButton({
   active,
@@ -359,7 +406,9 @@ function ViewButton({
   icon,
 }: {
   active: boolean;
+
   onClick: () => void;
+
   icon: React.ReactNode;
 }) {
   return (
@@ -376,47 +425,33 @@ function ViewButton({
   );
 }
 
+/* ================= NOTIFICATION ITEM ================= */
+
 function NotificationItem({
   title,
   description,
 }: {
   title: string;
+
   description: string;
 }) {
   return (
     <div className="p-4 rounded-2xl bg-secondary hover:bg-secondary/70 transition-all cursor-pointer">
 
       <h4 className="font-semibold text-sm mb-1">
+
         {title}
       </h4>
 
       <p className="text-xs text-muted-foreground">
+
         {description}
       </p>
     </div>
   );
 }
 
-function MessageItem({
-  name,
-  message,
-}: {
-  name: string;
-  message: string;
-}) {
-  return (
-    <div className="p-4 rounded-2xl bg-secondary hover:bg-secondary/70 transition-all cursor-pointer">
-
-      <h4 className="font-semibold text-sm mb-1">
-        {name}
-      </h4>
-
-      <p className="text-xs text-muted-foreground">
-        {message}
-      </p>
-    </div>
-  );
-}
+/* ================= PROFILE BUTTON ================= */
 
 function ProfileButton({
   icon,
@@ -425,8 +460,11 @@ function ProfileButton({
   onClick,
 }: {
   icon: React.ReactNode;
+
   label: string;
+
   danger?: boolean;
+
   onClick?: () => void;
 }) {
   return (
@@ -444,6 +482,7 @@ function ProfileButton({
       {icon}
 
       <span className="text-sm font-medium">
+
         {label}
       </span>
     </button>

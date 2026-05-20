@@ -1,97 +1,353 @@
-import { Calendar } from 'lucide-react';
+import {
+  Calendar,
+  Trash2,
+  Check,
+  Pencil,
+} from 'lucide-react';
+
+import {
+  useState,
+} from 'react';
+
 import { Draggable } from '@hello-pangea/dnd';
 
-export interface TaskTag {
-  label: string;
-  color: 'red' | 'green' | 'blue' | 'purple' | 'orange' | 'pink';
-}
+import { useTaskStore } from '../../../store/useTaskStore';
 
-export interface TaskCardProps {
+/* ================= TYPES ================= */
+
+interface Task {
+  _id: string;
+
   title: string;
+
   description: string;
-  image?: string;
-  tags: TaskTag[];
-  date: string;
-  assignees: string[];
+
+  status: string;
+
+  priority:
+    | 'low'
+    | 'medium'
+    | 'high';
+
+  dueDate?: string;
 }
 
-interface DraggableTaskCardProps {
-  task: TaskCardProps & { id: string };
+interface TaskCardProps {
+  task: Task;
+
   index: number;
+
+  view?:
+    | 'kanban'
+    | 'grid'
+    | 'list';
 }
 
-export default function TaskCard({ task, index }: DraggableTaskCardProps) {
-  
-  // Tailwind color mapping helper for dynamic tags
-  const getColorClasses = (color: string) => {
-    switch(color) {
-      case 'red': return 'bg-red-500/10 text-red-500 border-red-500/20';
-      case 'green': return 'bg-green-500/10 text-green-500 border-green-500/20';
-      case 'blue': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      case 'purple': return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
-      case 'orange': return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
-      case 'pink': return 'bg-pink-500/10 text-pink-500 border-pink-500/20';
-      default: return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+/* ================= COMPONENT ================= */
+
+export default function TaskCard({
+  task,
+  index,
+  view = 'kanban',
+}: TaskCardProps) {
+  const {
+    deleteTaskById,
+    updateTaskById,
+  } = useTaskStore();
+
+  /* ================= EDIT MODE ================= */
+
+  const [editing, setEditing] =
+    useState(false);
+
+  const [title, setTitle] =
+    useState(task.title);
+
+  const [
+    description,
+    setDescription,
+  ] = useState(
+    task.description
+  );
+
+  /* ================= PRIORITY COLORS ================= */
+
+  const getPriorityClasses = (
+    priority: string
+  ) => {
+    switch (priority) {
+      case 'high':
+        return 'bg-red-500/10 text-red-500 border-red-500/20';
+
+      case 'medium':
+        return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+
+      case 'low':
+        return 'bg-green-500/10 text-green-500 border-green-500/20';
+
+      default:
+        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
     }
   };
 
+  /* ================= SAVE ================= */
+
+  const handleSave =
+    async () => {
+      await updateTaskById(
+        task._id,
+        {
+          title,
+          description,
+        }
+      );
+
+      setEditing(false);
+    };
+
+  /* ================= DELETE ================= */
+
+  const handleDelete =
+    async () => {
+      await deleteTaskById(
+        task._id
+      );
+    };
+
+  /* ================= PRIORITY ================= */
+
+  const cyclePriority =
+    async () => {
+      const next =
+        task.priority === 'low'
+          ? 'medium'
+          : task.priority ===
+            'medium'
+          ? 'high'
+          : 'low';
+
+      await updateTaskById(
+        task._id,
+        {
+          priority: next,
+        }
+      );
+    };
+
+  /* ================= CARD CONTENT ================= */
+
+  const content = (
+    <div
+      className={`
+        bg-card
+        border
+        rounded-2xl
+        p-5
+        shadow-sm
+        hover:shadow-md
+        hover:border-primary/50
+        transition-all
+        group
+        w-full
+
+        ${
+          view === 'list'
+            ? 'flex items-center justify-between gap-5'
+            : ''
+        }
+      `}
+    >
+
+      {/* LEFT */}
+
+      <div className="flex-1">
+
+        {/* HEADER */}
+
+        <div className="flex items-start justify-between gap-3 mb-3">
+
+          {/* TITLE */}
+
+          <div className="flex-1">
+
+            {editing ? (
+              <input
+                value={title}
+                onChange={(e) =>
+                  setTitle(
+                    e.target.value
+                  )
+                }
+                className="w-full bg-secondary rounded-xl px-3 py-2 outline-none text-sm font-semibold"
+              />
+            ) : (
+              <h3
+                className={`
+                  font-bold text-foreground leading-tight
+
+                  ${
+                    view ===
+                    'grid'
+                      ? 'text-xl'
+                      : 'text-base'
+                  }
+                `}
+              >
+                {task.title}
+              </h3>
+            )}
+          </div>
+
+          {/* ACTIONS */}
+
+          <div className="flex items-center gap-2">
+
+            {editing ? (
+              <button
+                onClick={
+                  handleSave
+                }
+                className="text-green-500 hover:scale-110 transition-all"
+              >
+                <Check
+                  size={16}
+                />
+              </button>
+            ) : (
+              <button
+                onClick={() =>
+                  setEditing(
+                    true
+                  )
+                }
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Pencil
+                  size={16}
+                />
+              </button>
+            )}
+
+            <button
+              onClick={
+                handleDelete
+              }
+              className="text-muted-foreground hover:text-red-500 transition-colors"
+            >
+              <Trash2
+                size={16}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* DESCRIPTION */}
+
+        {editing ? (
+          <textarea
+            value={description}
+            onChange={(e) =>
+              setDescription(
+                e.target.value
+              )
+            }
+            className="w-full min-h-[90px] bg-secondary rounded-xl px-3 py-3 outline-none text-sm resize-none mb-5"
+          />
+        ) : (
+          <p
+            className={`
+              text-sm text-muted-foreground leading-relaxed break-words
+
+              ${
+                view ===
+                'list'
+                  ? 'line-clamp-1'
+                  : view ===
+                    'grid'
+                  ? 'line-clamp-5'
+                  : 'line-clamp-3'
+              }
+
+              mb-5
+            `}
+          >
+            {task.description}
+          </p>
+        )}
+
+        {/* PRIORITY */}
+
+        <div className="flex flex-wrap gap-2 mb-5">
+
+          <button
+            onClick={
+              cyclePriority
+            }
+            className={`text-[10px] font-bold px-2 py-1 rounded-md border uppercase tracking-wider transition-all hover:scale-105 ${getPriorityClasses(
+              task.priority
+            )}`}
+          >
+            {task.priority}
+          </button>
+
+          <span className="text-[10px] font-bold px-2 py-1 rounded-md border uppercase tracking-wider bg-primary/10 text-primary border-primary/20">
+
+            {task.status}
+          </span>
+        </div>
+
+        {/* FOOTER */}
+
+        <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
+
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+
+            <Calendar
+              size={14}
+            />
+
+            <span>
+              {task.dueDate
+                ? new Date(
+                    task.dueDate
+                  ).toLocaleDateString()
+                : 'No due date'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ================= LIST/GRID ================= */
+
+  if (view !== 'kanban') {
+    return content;
+  }
+
+  /* ================= KANBAN ================= */
+
   return (
-    <Draggable draggableId={task.id} index={index}>
+    <Draggable
+      draggableId={task._id}
+      index={index}
+    >
       {(provided, snapshot) => (
-        <div 
+        <div
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`bg-card border rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary/50 transition-all group ${
-            snapshot.isDragging ? 'shadow-xl shadow-primary/20 rotate-2 border-primary ring-2 ring-primary/20 cursor-grabbing z-50' : 'cursor-grab'
-          }`}
-          style={{ ...provided.draggableProps.style }}
+          style={{
+            ...provided
+              .draggableProps.style,
+          }}
+          className={
+            snapshot.isDragging
+              ? 'rotate-2 z-50'
+              : ''
+          }
         >
-          
-          {/* Optional Header Image */}
-          {task.image && (
-            <div className="w-full h-32 mb-4 rounded-xl overflow-hidden relative">
-              <img src={task.image} alt={task.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-            </div>
-          )}
-
-          {/* Content */}
-          <h3 className="font-bold text-foreground mb-2 leading-tight">{task.title}</h3>
-          <p className="text-sm text-muted-foreground line-clamp-3 mb-4 leading-relaxed">
-            {task.description}
-          </p>
-
-          {/* Tags */}
-          <div className="flex flex-wrap gap-2 mb-6">
-            {task.tags.map((tag, idx) => (
-              <span 
-                key={idx} 
-                className={`text-[10px] font-bold px-2 py-1 rounded-md border uppercase tracking-wider ${getColorClasses(tag.color)}`}
-              >
-                {tag.label}
-              </span>
-            ))}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Calendar size={14} />
-              <span>{task.date}</span>
-            </div>
-            
-            {/* Assignees */}
-            <div className="flex -space-x-2">
-              {task.assignees.map((src, idx) => (
-                <img 
-                  key={idx}
-                  src={src} 
-                  alt="Assignee" 
-                  className="w-6 h-6 rounded-full border-2 border-card object-cover"
-                />
-              ))}
-            </div>
-          </div>
+          {content}
         </div>
       )}
     </Draggable>

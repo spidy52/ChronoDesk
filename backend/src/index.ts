@@ -2,43 +2,69 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
+
 import { Server } from 'socket.io';
-import authRoutes from './modules/auth/auth.routes';
+
+import routes from './routes';
 
 import { connectDB } from './config/db';
 
 dotenv.config();
 
 const app = express();
+
 const server = http.createServer(app);
 
-// Connect to MongoDB
+/* ================= DATABASE ================= */
+
 connectDB();
-const io = new Server(server, {
+
+/* ================= SOCKET ================= */
+
+export const io = new Server(server, {
   cors: {
-    origin: '*', // Configure this properly in production
-    methods: ['GET', 'POST']
-  }
+    origin: 'http://localhost:5173',
+    credentials: true,
+  },
 });
 
-// Middleware
-app.use(cors());
+/* ================= MIDDLEWARE ================= */
+
+app.use(
+  cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
-// Routes
-app.use('/api/auth', authRoutes);
+/* ================= ROUTES ================= */
 
-// Socket.io
+app.use('/api', routes);
+
+/* ================= SOCKET EVENTS ================= */
+
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
-  
+  console.log(
+    'User connected:',
+    socket.id
+  );
+
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log(
+      'User disconnected:',
+      socket.id
+    );
   });
 });
+
+/* ================= SERVER ================= */
 
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(
+    `Server running on port ${PORT}`
+  );
 });

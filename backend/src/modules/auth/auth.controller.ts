@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { User } from '../../models/User';
+import User  from '../../models/User';
 import { EventService } from '../events/event.service';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-chrono-key-change-me';
