@@ -1,94 +1,76 @@
 import {
-  Leaf,
-  LayoutDashboard,
-  Box,
-  Hexagon,
-  CircleDot,
   Plus,
+  Home,
 } from 'lucide-react';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useWorkspaceStore } from '../../../store/workspaceStore';
+import CreateWorkspaceModal from './modals/CreateWorkspaceModal';
 
 export default function WorkspaceDock() {
-  const [activeWorkspace, setActiveWorkspace] =
-    useState('dashboard');
+  const { workspaces, activeWorkspace, setActiveWorkspace, fetchAllWorkspaces } = useWorkspaceStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const workspaces = [
-    {
-      id: 'nature',
-      icon: <Leaf size={20} />,
-      color: 'bg-green-500',
-      label: 'Nature Workspace',
-    },
-    {
-      id: 'dashboard',
-      icon: <LayoutDashboard size={20} />,
-      color: 'bg-blue-500',
-      label: 'Main Dashboard',
-    },
-    {
-      id: 'box',
-      icon: <Box size={20} />,
-      color: 'bg-red-500',
-      label: 'Storage Workspace',
-    },
-    {
-      id: 'hex',
-      icon: <Hexagon size={20} />,
-      color: 'bg-pink-500',
-      label: 'Creative Workspace',
-    },
-    {
-      id: 'circle',
-      icon: <CircleDot size={20} />,
-      color: 'bg-purple-500',
-      label: 'AI Workspace',
-    },
-  ];
+  useEffect(() => {
+    fetchAllWorkspaces();
+  }, []);
 
-  const handleWorkspaceSwitch = (id: string) => {
-    setActiveWorkspace(id);
+  const handleWorkspaceSwitch = (workspace: any) => {
+    setActiveWorkspace(workspace);
+    console.log('Switch workspace:', workspace ? workspace._id : 'all');
+  };
 
-    console.log('Switch workspace:', id);
-
-    // TODO:
-    // Load workspace data
-    // Fetch tasks
-    // Fetch members
-    // Fetch chats
+  // Generate color based on string length and char codes
+  const getColor = (name: string) => {
+    const colors = [
+      'bg-green-500',
+      'bg-blue-500',
+      'bg-red-500',
+      'bg-pink-500',
+      'bg-purple-500',
+      'bg-orange-500',
+      'bg-teal-500',
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
   };
 
   return (
     <div className="w-20 h-full bg-zinc-950 border-r border-zinc-900 flex flex-col items-center py-6 shrink-0 z-30">
 
-      {/* Mac Controls */}
-      <div className="flex gap-2 mb-10">
-        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-      </div>
-
       {/* Workspace Icons */}
       <div className="flex flex-col items-center gap-4 flex-1 w-full">
+        
+        {/* Home Workspace (Default) */}
+        <WorkspaceIcon
+          icon={<Home size={20} />}
+          color="bg-zinc-100 text-zinc-900"
+          label="Personal Home"
+          active={activeWorkspace === null}
+          onClick={() => handleWorkspaceSwitch(null)}
+        />
+        
+        <div className="w-10 h-px bg-zinc-800 my-1"></div>
 
         {workspaces.map((workspace) => (
           <WorkspaceIcon
-            key={workspace.id}
-            icon={workspace.icon}
-            color={workspace.color}
-            label={workspace.label}
-            active={activeWorkspace === workspace.id}
+            key={workspace._id}
+            icon={<span className="text-sm font-bold">{workspace.name.substring(0, 2).toUpperCase()}</span>}
+            color={getColor(workspace.name)}
+            label={workspace.name}
+            active={activeWorkspace?._id === workspace._id}
             onClick={() =>
-              handleWorkspaceSwitch(workspace.id)
+              handleWorkspaceSwitch(workspace)
             }
           />
         ))}
 
         {/* Add Workspace */}
         <button
-          onClick={() =>
-            alert('Open create workspace modal')
-          }
+          onClick={() => setIsModalOpen(true)}
           className="w-11 h-11 mt-6 rounded-2xl border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-900 transition-all"
         >
           <Plus size={20} />
@@ -96,9 +78,13 @@ export default function WorkspaceDock() {
       </div>
 
       {/* Bottom Indicator */}
-      <div className="text-[10px] text-zinc-600 mt-6">
-        ChronoDesk
+      <div className="text-[10px] text-zinc-600 mt-6 font-semibold tracking-wider">
+        CD
       </div>
+
+      {isModalOpen && (
+        <CreateWorkspaceModal onClose={() => setIsModalOpen(false)} />
+      )}
     </div>
   );
 }

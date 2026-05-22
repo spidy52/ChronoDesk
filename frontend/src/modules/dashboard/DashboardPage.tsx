@@ -11,7 +11,17 @@ import TopBar from './components/TopBar';
 
 import KanbanBoard from './components/KanbanBoard';
 
+import { useWorkspaceStore } from '../../store/workspaceStore';
+
 export default function DashboardPage() {
+  const { fetchAllWorkspaces } = useWorkspaceStore();
+
+  /* ================= INITIALIZE WORKSPACES ================= */
+
+  useEffect(() => {
+    fetchAllWorkspaces();
+  }, [fetchAllWorkspaces]);
+
   /* ================= SIDEBAR ================= */
 
   const [sidebarOpen, setSidebarOpen] =

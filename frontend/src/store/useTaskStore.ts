@@ -5,7 +5,10 @@ import {
   createTask,
   updateTask,
   deleteTask,
+  addCollaborator,
+  removeCollaborator,
 } from '../services/task.service';
+import { socket } from '../services/socket';
 
 interface Task {
   _id: string;
@@ -17,6 +20,15 @@ interface Task {
   status: string;
 
   priority: string;
+
+  workspaceId: string;
+
+  dueDate?: string;
+
+  assignee?: any;
+
+  createdBy?: any;
+  collaborators?: any[];
 }
 
 interface TaskStore {
@@ -24,7 +36,9 @@ interface TaskStore {
 
   loading: boolean;
 
-  fetchAllTasks: () => Promise<void>;
+  fetchAllTasks: (
+    workspaceId?: string
+  ) => Promise<void>;
 
   addTask: (
     task: any
@@ -38,11 +52,23 @@ interface TaskStore {
   deleteTaskById: (
     id: string
   ) => Promise<void>;
+
+  addCollaboratorToTask: (
+    taskId: string,
+    userId: string
+  ) => Promise<void>;
+
+  removeCollaboratorFromTask: (
+    taskId: string,
+    userId: string
+  ) => Promise<void>;
+
+  setupTaskSocketListeners: () => void;
 }
 
 export const useTaskStore =
   create<TaskStore>(
-    (set, get) => ({
+    (set) => ({
       tasks: [],
 
       loading: false,
@@ -50,14 +76,16 @@ export const useTaskStore =
       /* ================= FETCH ================= */
 
       fetchAllTasks:
-        async () => {
+        async (workspaceId) => {
           set({
             loading: true,
           });
 
           try {
             const tasks =
-              await fetchTasks();
+              await fetchTasks(
+                workspaceId
+              );
 
             set({
               tasks,
@@ -144,5 +172,69 @@ export const useTaskStore =
             console.error(error);
           }
         },
+
+      /* ================= COLLABORATORS ================= */
+
+      addCollaboratorToTask: async (taskId, userId) => {
+        try {
+          const updated = await addCollaborator(taskId, userId);
+          set((state) => ({
+            tasks: state.tasks.map((task) =>
+              task._id === taskId ? updated : task
+            ),
+          }));
+        } catch (error) {
+          console.error(error);
+        }
+      },
+
+      removeCollaboratorFromTask: async (taskId, userId) => {
+        try {
+          const updated = await removeCollaborator(taskId, userId);
+          set((state) => ({
+            tasks: state.tasks.map((task) =>
+              task._id === taskId ? updated : task
+            ),
+          }));
+        } catch (error) {
+          console.error(error);
+        }
+      },
+
+      /* ================= SOCKET ================= */
+      setupTaskSocketListeners: () => {
+        socket.off('task:created');
+        socket.off('task:updated');
+        socket.off('task:deleted');
+
+        socket.on('task:created', (task) => {
+          set((state) => ({
+            tasks: [task, ...state.tasks.filter((t) => t._id !== task._id)],
+          }));
+        });
+
+        socket.on('task:updated', (updatedTask) => {
+          set((state) => {
+            const exists = state.tasks.some((t) => t._id === updatedTask._id);
+            if (exists) {
+              return {
+                tasks: state.tasks.map((task) =>
+                  task._id === updatedTask._id ? updatedTask : task
+                ),
+              };
+            }
+            // If it doesn't exist, it means we were just added as a collaborator, so add it
+            return {
+              tasks: [updatedTask, ...state.tasks],
+            };
+          });
+        });
+
+        socket.on('task:deleted', (taskId) => {
+          set((state) => ({
+            tasks: state.tasks.filter((t) => t._id !== taskId),
+          }));
+        });
+      },
     })
   );

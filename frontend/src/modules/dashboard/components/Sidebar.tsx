@@ -8,10 +8,14 @@ import {
   LifeBuoy,
   Settings,
   LogOut,
+  Trash2,
 } from 'lucide-react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuthStore } from '../../auth/store';
+import { useWorkspaceStore } from '../../../store/workspaceStore';
+import DeleteWorkspaceModal from './modals/DeleteWorkspaceModal';
 
 export default function Sidebar({
   isOpen,
@@ -19,11 +23,18 @@ export default function Sidebar({
   isOpen: boolean;
 }) {
   const { user, logout } = useAuthStore();
+  const { activeWorkspace } = useWorkspaceStore();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navItems = [
+  const handleDeleteWorkspace = () => {
+    if (!activeWorkspace) return;
+    setIsDeleteModalOpen(true);
+  };
+
+  const navItems: { label: string; icon: React.ReactNode; path: string; badge?: string }[] = [
     {
       label: 'Tasks Board',
       icon: <LayoutList size={18} />,
@@ -33,7 +44,6 @@ export default function Sidebar({
       label: 'My Task',
       icon: <CheckSquare size={18} />,
       path: '/my-tasks',
-      badge: '2',
     },
     {
       label: 'Timesheet',
@@ -79,8 +89,8 @@ export default function Sidebar({
 
             <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-3xl">
               {user?.name?.charAt(0) ||
-                user?.email?.charAt(0) ||
-                'C'}
+                user?.email?.charAt(0) 
+                }
             </div>
           </div>
 
@@ -90,15 +100,15 @@ export default function Sidebar({
 
         {/* User Info */}
         <h2 className="font-bold text-xl text-foreground">
-          {user?.name || 'Workspace User'}
+          {user?.name }
         </h2>
 
         <p className="text-sm text-muted-foreground mt-1">
-          {user?.email || 'user@chronodesk.ai'}
+          {user?.email }
         </p>
 
         <span className="text-xs text-primary mt-3 bg-primary/10 px-3 py-1 rounded-full font-medium">
-          @chronodesk_admin
+          @{user?.username }
         </span>
       </div>
 
@@ -131,8 +141,17 @@ export default function Sidebar({
             <NavItem
               icon={<Settings size={18} />}
               label="Settings"
-              onClick={() => alert('Open settings')}
+              onClick={() => navigate('/settings')}
             />
+
+            {activeWorkspace && (
+              <NavItem
+                icon={<Trash2 size={18} />}
+                label="Delete Workspace"
+                danger
+                onClick={handleDeleteWorkspace}
+              />
+            )}
 
             <NavItem
               icon={<LogOut size={18} />}
@@ -156,6 +175,10 @@ export default function Sidebar({
           onClick={() => alert('Open help center')}
         />
       </div>
+
+      {isDeleteModalOpen && (
+        <DeleteWorkspaceModal onClose={() => setIsDeleteModalOpen(false)} />
+      )}
     </div>
   );
 }

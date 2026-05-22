@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useChatStore } from '../../store/useChatStore';
-import { Send } from "lucide-react";
+import { Send, Smile, Paperclip } from "lucide-react";
 
 const MessageInput = () => {
   const { currentChat, sendMessage } = useChatStore();
@@ -38,29 +38,37 @@ const MessageInput = () => {
   };
 
   return (
-    <div className="bg-base-100 border-t border-base-300 px-4 py-3 flex-shrink-0">
-      <div className="flex items-end gap-2">
+    <div className="bg-card/80 backdrop-blur-md border-t border-border/50 p-4 pt-3 flex-shrink-0 z-20 relative">
+      <div className="max-w-4xl mx-auto flex items-end gap-3 bg-background border border-border/80 rounded-[28px] p-2 pr-2.5 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40 transition-all duration-200">
+        
+        <button className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors flex-shrink-0 mb-0.5">
+          <Paperclip size={20} />
+        </button>
+
         <textarea
           ref={textareaRef}
           value={content}
-          placeholder="Type a message..."
-          className="flex-1 px-4 py-2 bg-base-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm resize-none max-h-[120px] overflow-y-auto"
+          placeholder="Message..."
+          className="flex-1 py-3 bg-transparent focus:outline-none text-[15px] resize-none max-h-[120px] overflow-y-auto placeholder:text-muted-foreground/60 leading-relaxed"
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
         />
 
+        <button className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors flex-shrink-0 mb-0.5 hidden sm:flex">
+          <Smile size={20} />
+        </button>
+
         <button
           onClick={handleSend}
-          className={`p-2.5 rounded-full transition-all flex-shrink-0 ${
+          className={`p-3 rounded-full transition-all duration-300 flex-shrink-0 mb-0.5 flex items-center justify-center ${
             content.trim()
-              ? "bg-primary hover:bg-primary/90 text-primary-content"
-              : "bg-base-300 text-base-content/40 cursor-not-allowed"
+              ? "bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:-translate-y-0.5 scale-100"
+              : "bg-secondary text-muted-foreground scale-95 opacity-80 cursor-not-allowed"
           }`}
           disabled={!content.trim()}
-          aria-label="Send message"
         >
-          <Send className="w-5 h-5" />
+          <Send size={18} className={content.trim() ? "ml-0.5" : ""} />
         </button>
       </div>
     </div>

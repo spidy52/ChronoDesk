@@ -1,17 +1,16 @@
 import { useEffect } from 'react';
 
-import { Plus } from 'lucide-react';
-
-import {
-  DragDropContext,
-  Droppable,
-} from '@hello-pangea/dnd';
-
 import type { DropResult } from '@hello-pangea/dnd';
 
-import TaskCard from './TaskCard';
-
 import { useTaskStore } from '../../../store/useTaskStore';
+
+import { useWorkspaceStore } from '../../../store/workspaceStore';
+
+import KanbanView from './tasks/KanbanView';
+
+import GridView from './tasks/GridView';
+
+import ListView from './tasks/ListView';
 
 /* ================= COLUMNS ================= */
 
@@ -51,12 +50,18 @@ export default function KanbanBoard({
 
   searchTerm: string;
 }) {
+
   const {
     tasks,
     fetchAllTasks,
     updateTaskById,
     addTask,
+    deleteTaskById,
   } = useTaskStore();
+
+  const {
+    activeWorkspace,
+  } = useWorkspaceStore();
 
   /* ================= FETCH ================= */
 
@@ -68,6 +73,10 @@ export default function KanbanBoard({
 
   const filteredTasks =
     tasks.filter((task) => {
+
+      const currentWorkspaceId = activeWorkspace?._id || 'default';
+      const matchesWorkspace = task.workspaceId === currentWorkspaceId;
+
       const matchesFilter =
         !activeFilter ||
         task.priority ===
@@ -79,6 +88,7 @@ export default function KanbanBoard({
           .includes(
             searchTerm.toLowerCase()
           ) ||
+
         task.description
           .toLowerCase()
           .includes(
@@ -86,6 +96,7 @@ export default function KanbanBoard({
           );
 
       return (
+        matchesWorkspace &&
         matchesFilter &&
         matchesSearch
       );
@@ -96,6 +107,7 @@ export default function KanbanBoard({
   const onDragEnd = async (
     result: DropResult
   ) => {
+
     const {
       destination,
       draggableId,
@@ -112,6 +124,66 @@ export default function KanbanBoard({
     );
   };
 
+  /* ================= ADD ================= */
+
+  const handleAddTask = (
+    columnId: string
+  ) => {
+
+    addTask({
+      title: 'New Task',
+
+      description: '',
+
+      status: columnId,
+
+      priority: 'medium',
+
+      workspaceId:
+        activeWorkspace?._id ||
+        'default',
+    });
+  };
+
+  /* ================= EDIT ================= */
+
+  const handleEditTask =
+    async (
+      updatedTask: any
+    ) => {
+
+      await updateTaskById(
+        updatedTask._id,
+        updatedTask
+      );
+    };
+
+  /* ================= DELETE ================= */
+
+  const handleDeleteTask =
+    async (
+      taskId: string
+    ) => {
+
+      await deleteTaskById(
+        taskId
+      );
+    };
+
+  /* ================= PRIORITY ================= */
+
+  const handlePriorityChange =
+    async (
+      taskId: string,
+      priority: string
+    ) => {
+
+      await updateTaskById(
+        taskId,
+        { priority }
+      );
+    };
+
   return (
     <div className="w-full h-full overflow-hidden">
 
@@ -119,260 +191,85 @@ export default function KanbanBoard({
 
       {boardView ===
       'kanban' ? (
-        <DragDropContext
+
+        <KanbanView
+          columns={columns}
+
+          filteredTasks={
+            filteredTasks
+          }
+
           onDragEnd={onDragEnd}
-        >
-          <div className="w-full h-full overflow-x-auto overflow-y-auto scrollbar-hide">
 
-            <div className="flex gap-6 p-4 md:p-6 min-w-max min-h-full">
+          onAddTask={
+            handleAddTask
+          }
 
-              {columns.map(
-                (column) => {
-                  const columnTasks =
-                    filteredTasks.filter(
-                      (task) =>
-                        task.status ===
-                        column.id
-                    );
+          onEditTask={
+            handleEditTask
+          }
 
-                  return (
-                    <div
-                      key={
-                        column.id
-                      }
-                      className="w-[280px] sm:w-[320px] lg:w-[340px] shrink-0 flex flex-col"
-                    >
+          onDeleteTask={
+            handleDeleteTask
+          }
 
-                      {/* HEADER */}
+          onPriorityChange={
+            handlePriorityChange
+          }
+        />
 
-                      <div className="flex items-center justify-between mb-4 px-1">
+      ) : boardView ===
+        'grid' ? (
 
-                        <div className="flex items-center gap-3">
+        <GridView
+          columns={columns}
 
-                          <h2 className="font-bold text-xl">
+          filteredTasks={
+            filteredTasks
+          }
 
-                            {
-                              column.title
-                            }
-                          </h2>
+          onAddTask={
+            handleAddTask
+          }
 
-                          <span className="w-7 h-7 rounded-full bg-secondary text-muted-foreground flex items-center justify-center text-xs font-bold">
+          onEditTask={
+            handleEditTask
+          }
 
-                            {
-                              columnTasks.length
-                            }
-                          </span>
-                        </div>
+          onDeleteTask={
+            handleDeleteTask
+          }
 
-                        {/* ADD */}
+          onPriorityChange={
+            handlePriorityChange
+          }
+        />
 
-                        <button
-                          onClick={() =>
-                            addTask({
-                              title:
-                                'New Task',
-
-                              description:
-                                '',
-
-                              status:
-                                column.id,
-
-                              priority:
-                                'medium',
-
-                              workspaceId:
-                                'workspace-1',
-                            })
-                          }
-                          className="w-9 h-9 rounded-full border border-dashed border-border flex items-center justify-center text-muted-foreground hover:text-white hover:border-primary hover:bg-primary/10 transition-all"
-                        >
-                          <Plus
-                            size={16}
-                          />
-                        </button>
-                      </div>
-
-                      {/* DROPPABLE */}
-
-                      <Droppable
-                        droppableId={
-                          column.id
-                        }
-                      >
-                        {(
-                          provided,
-                          snapshot
-                        ) => (
-                          <div
-                            ref={
-                              provided.innerRef
-                            }
-                            {...provided.droppableProps}
-                            className={`
-                              min-h-[300px]
-                              flex flex-col gap-4 rounded-2xl transition-all duration-200
-                              ${
-                                snapshot.isDraggingOver
-                                  ? 'bg-secondary/30 p-2 outline outline-2 outline-primary/30'
-                                  : ''
-                              }
-                            `}
-                          >
-
-                            {columnTasks.map(
-                              (
-                                task,
-                                index
-                              ) => (
-                                <TaskCard
-                                  key={
-                                    task._id
-                                  }
-                                  task={
-                                    task
-                                  }
-                                  index={
-                                    index
-                                  }
-                                  view={boardView}
-                                />
-                              )
-                            )}
-
-                            {
-                              provided.placeholder
-                            }
-                          </div>
-                        )}
-                      </Droppable>
-                    </div>
-                  );
-                }
-              )}
-            </div>
-          </div>
-        </DragDropContext>
       ) : (
-        /* ================= GRID/LIST ================= */
 
-        <div className="h-full overflow-y-auto p-4 md:p-6">
+        <ListView
+          columns={columns}
 
-          <div className="flex flex-col gap-8">
+          filteredTasks={
+            filteredTasks
+          }
 
-            {columns.map((column) => {
-              const columnTasks =
-                filteredTasks.filter(
-                  (task) =>
-                    task.status ===
-                    column.id
-                );
+          onAddTask={
+            handleAddTask
+          }
 
-              return (
-                <div key={column.id}>
+          onEditTask={
+            handleEditTask
+          }
 
-                  {/* SECTION HEADER */}
+          onDeleteTask={
+            handleDeleteTask
+          }
 
-                  <div className="flex items-center justify-between mb-4">
-
-                    <div className="flex items-center gap-3">
-
-                      <h2 className="font-bold text-2xl">
-
-                        {column.title}
-                      </h2>
-
-                      <span className="w-7 h-7 rounded-full bg-secondary text-muted-foreground flex items-center justify-center text-xs font-bold">
-
-                        {columnTasks.length}
-                      </span>
-                    </div>
-
-                    {/* ADD BUTTON */}
-
-                    <button
-                      onClick={() =>
-                        addTask({
-                          title:
-                            'New Task',
-
-                          description:
-                            '',
-
-                          status:
-                            column.id,
-
-                          priority:
-                            'medium',
-
-                          workspaceId:
-                            'workspace-1',
-                        })
-                      }
-                      className="w-9 h-9 rounded-full border border-dashed border-border flex items-center justify-center text-muted-foreground hover:text-white hover:border-primary hover:bg-primary/10 transition-all"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
-
-                  {/* GRID MODE */}
-
-                  {boardView ===
-                  'grid' ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
-
-                      {columnTasks.map(
-                        (
-                          task,
-                          index
-                        ) => (
-                          <TaskCard
-                            key={
-                              task._id
-                            }
-                            task={
-                              task
-                            }
-                            index={
-                              index
-                            }
-                            view={boardView}
-                          />
-                        )
-                      )}
-                    </div>
-                  ) : (
-                    /* LIST MODE */
-
-                    <div className="flex flex-col gap-4">
-
-                      {columnTasks.map(
-                        (
-                          task,
-                          index
-                        ) => (
-                          <div
-                            key={
-                              task._id
-                            }
-                            className="w-full"
-                          >
-
-                            <TaskCard
-                              task={task}
-                              index={index}
-                              view={boardView}
-                            />
-                          </div>
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+          onPriorityChange={
+            handlePriorityChange
+          }
+        />
       )}
     </div>
   );

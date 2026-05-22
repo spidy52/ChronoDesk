@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -12,12 +13,16 @@ import RegisterPage from './modules/auth/RegisterPage';
 import { useAuthStore } from './modules/auth/store';
 
 import DashboardPage from './modules/dashboard/DashboardPage';
+import WhiteboardPage from './modules/board/components/WhiteboardPage';
 
 import MyTasksPage from './modules/dashboard/pages/MyTasksPage';
+
 import CalendarPage from './modules/dashboard/pages/CalendarPage';
 import TimesheetPage from './modules/dashboard/pages/TimesheetPage';
 import MembersPage from './modules/dashboard/pages/MembersPage';
 import ChatsPage from './modules/dashboard/pages/ChatsPage';
+import SettingsPage from './modules/dashboard/pages/SettingsPage';
+import { useUIStore, applyTheme } from './store/useUIStore';
 
 /* ---------------- PROTECTED ROUTE ---------------- */
 
@@ -46,6 +51,19 @@ function ProtectedRoute({
 /* ---------------- APP ---------------- */
 
 function App() {
+  const theme = useUIStore((state) => state.theme);
+
+  useEffect(() => {
+    applyTheme(theme);
+
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => applyTheme('system');
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+  }, [theme]);
+
   return (
     <BrowserRouter>
 
@@ -74,6 +92,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* WHITEBOARD */}
+        <Route
+          path="/board/:taskId"
+          element={
+            <ProtectedRoute>
+              <WhiteboardPage />
+            </ProtectedRoute>
+          }
+        />
+
 
         {/* MY TASKS */}
         <Route
@@ -121,6 +150,16 @@ function App() {
           element={
             <ProtectedRoute>
               <ChatsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* SETTINGS */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
             </ProtectedRoute>
           }
         />

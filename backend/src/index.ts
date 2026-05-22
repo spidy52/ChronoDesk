@@ -2,16 +2,20 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import http from 'http';
+import path from 'path';
 
 import { Server } from 'socket.io';
-
+import { setupSocketHandlers } from './socket';
 import routes from './routes';
 
 import { connectDB } from './config/db';
 
+import { errorHandler, notFound } from './middleware/error.middleware';
+
 dotenv.config();
 
 const app = express();
+
 
 const server = http.createServer(app);
 
@@ -38,26 +42,22 @@ app.use(
 );
 
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 /* ================= ROUTES ================= */
 
+
 app.use('/api', routes);
+
+/* ================= ERROR HANDLING ================= */
+
+app.use(notFound);
+
+app.use(errorHandler);
 
 /* ================= SOCKET EVENTS ================= */
 
-io.on('connection', (socket) => {
-  console.log(
-    'User connected:',
-    socket.id
-  );
-
-  socket.on('disconnect', () => {
-    console.log(
-      'User disconnected:',
-      socket.id
-    );
-  });
-});
+setupSocketHandlers(io);
 
 /* ================= SERVER ================= */
 

@@ -1,6 +1,6 @@
 import DashboardLayout from '../../../layouts/DashboardLayout';
 
-import ChatSidebar from '../components/chat/chatSidebar';
+import ChatSidebar from '../components/chat/ChatSidebar';
 import ChatContainer from '../components/chat/ChatContainer';
 
 export default function ChatsPage() {

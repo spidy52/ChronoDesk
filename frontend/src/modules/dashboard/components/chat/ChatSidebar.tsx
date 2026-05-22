@@ -52,11 +52,13 @@ const ChatSidebar = () => {
   /* ================= GET OTHER USER ================= */
 
   const getOtherUser = useCallback(
-    (chat: any) =>
-      chat.participants?.find(
-        (p: any) => p._id !== user?._id
-      ),
-    [user?._id]
+    (chat: any) => {
+      const myId = user?.id || user?._id;
+      return chat.participants?.find(
+        (p: any) => p._id !== myId
+      );
+    },
+    [user?.id, user?._id]
   );
 
   /* ================= SEARCH ================= */

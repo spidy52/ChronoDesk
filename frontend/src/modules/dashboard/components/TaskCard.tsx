@@ -3,15 +3,21 @@ import {
   Trash2,
   Check,
   Pencil,
+  Flag,
+  Plus,
 } from 'lucide-react';
 
 import {
   useState,
 } from 'react';
 
+import { useNavigate } from 'react-router-dom';
 import { Draggable } from '@hello-pangea/dnd';
 
+
 import { useTaskStore } from '../../../store/useTaskStore';
+import { useAuthStore } from '../../auth/store';
+import InviteCollaboratorModal from './modals/InviteCollaboratorModal';
 
 /* ================= TYPES ================= */
 
@@ -30,6 +36,14 @@ interface Task {
     | 'high';
 
   dueDate?: string;
+
+  workspaceId?: string;
+
+  assignee?: any;
+
+  createdBy?: any;
+
+  collaborators?: any[];
 }
 
 interface TaskCardProps {
@@ -50,15 +64,24 @@ export default function TaskCard({
   index,
   view = 'kanban',
 }: TaskCardProps) {
+
   const {
     deleteTaskById,
     updateTaskById,
   } = useTaskStore();
 
-  /* ================= EDIT MODE ================= */
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+
+  /* ================= STATES ================= */
 
   const [editing, setEditing] =
     useState(false);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const [title, setTitle] =
     useState(task.title);
@@ -70,23 +93,52 @@ export default function TaskCard({
     task.description
   );
 
+  const [dueDate, setDueDate] =
+    useState(
+      task.dueDate
+        ? new Date(
+            task.dueDate
+          )
+            .toISOString()
+            .split('T')[0]
+        : ''
+    );
+
   /* ================= PRIORITY COLORS ================= */
 
   const getPriorityClasses = (
     priority: string
   ) => {
+
     switch (priority) {
+
       case 'high':
-        return 'bg-red-500/10 text-red-500 border-red-500/20';
+        return `
+          bg-red-500/10
+          text-red-500
+          border-red-500/20
+        `;
 
       case 'medium':
-        return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+        return `
+          bg-orange-500/10
+          text-orange-500
+          border-orange-500/20
+        `;
 
       case 'low':
-        return 'bg-green-500/10 text-green-500 border-green-500/20';
+        return `
+          bg-green-500/10
+          text-green-500
+          border-green-500/20
+        `;
 
       default:
-        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+        return `
+          bg-gray-500/10
+          text-gray-500
+          border-gray-500/20
+        `;
     }
   };
 
@@ -94,83 +146,162 @@ export default function TaskCard({
 
   const handleSave =
     async () => {
-      await updateTaskById(
-        task._id,
-        {
-          title,
-          description,
-        }
-      );
 
-      setEditing(false);
+      try {
+
+        setLoading(true);
+
+        await updateTaskById(
+          task._id,
+          {
+            title,
+
+            description,
+
+            dueDate,
+          }
+        );
+
+        setEditing(false);
+
+      } catch (error) {
+
+        console.error(error);
+
+      } finally {
+
+        setLoading(false);
+      }
     };
 
   /* ================= DELETE ================= */
 
   const handleDelete =
     async () => {
-      await deleteTaskById(
-        task._id
-      );
+
+      try {
+
+        await deleteTaskById(
+          task._id
+        );
+
+      } catch (error) {
+
+        console.error(error);
+      }
     };
 
   /* ================= PRIORITY ================= */
 
   const cyclePriority =
     async () => {
-      const next =
-        task.priority === 'low'
-          ? 'medium'
-          : task.priority ===
-            'medium'
-          ? 'high'
-          : 'low';
 
-      await updateTaskById(
-        task._id,
-        {
-          priority: next,
-        }
-      );
+      try {
+
+        const next =
+          task.priority ===
+          'low'
+            ? 'medium'
+            : task.priority ===
+              'medium'
+            ? 'high'
+            : 'low';
+
+        await updateTaskById(
+          task._id,
+          {
+            priority: next,
+          }
+        );
+
+      } catch (error) {
+
+        console.error(error);
+      }
     };
 
-  /* ================= CARD CONTENT ================= */
+  /* ================= DATE ================= */
+
+  const handleDateChange =
+    async (
+      value: string
+    ) => {
+
+      try {
+
+        setDueDate(value);
+
+        await updateTaskById(
+          task._id,
+          {
+            dueDate: value,
+          }
+        );
+
+      } catch (error) {
+
+        console.error(error);
+      }
+    };
+
+  /* ================= CONTENT ================= */
+
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const interactive = target.closest('button, input, select, textarea, a, [role="button"]');
+    if (editing || (interactive && e.currentTarget.contains(interactive))) {
+      return;
+    }
+    navigate(`/board/${task._id}`);
+  };
 
   const content = (
     <div
+      onClick={handleCardClick}
       className={`
-        bg-card
+        cursor-pointer
+        bg-card/95
+        backdrop-blur-sm
         border
-        rounded-2xl
+        border-border/60
+        rounded-3xl
         p-5
         shadow-sm
-        hover:shadow-md
-        hover:border-primary/50
+        hover:shadow-xl
+        hover:border-primary/40
         transition-all
+        duration-300
         group
         w-full
+        overflow-hidden
 
         ${
           view === 'list'
-            ? 'flex items-center justify-between gap-5'
+            ? `
+              flex
+              items-center
+              justify-between
+              gap-5
+            `
             : ''
         }
       `}
     >
 
-      {/* LEFT */}
+      {/* MAIN */}
 
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
 
-        {/* HEADER */}
+        {/* TOP */}
 
-        <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-start justify-between gap-3 mb-4">
 
           {/* TITLE */}
 
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
 
             {editing ? (
+
               <input
                 value={title}
                 onChange={(e) =>
@@ -178,12 +309,28 @@ export default function TaskCard({
                     e.target.value
                   )
                 }
-                className="w-full bg-secondary rounded-xl px-3 py-2 outline-none text-sm font-semibold"
+                className="
+                  w-full
+                  bg-secondary/70
+                  rounded-xl
+                  px-3
+                  py-2
+                  outline-none
+                  text-sm
+                  font-semibold
+                  border
+                  border-border
+                "
               />
+
             ) : (
+
               <h3
                 className={`
-                  font-bold text-foreground leading-tight
+                  font-bold
+                  text-foreground
+                  leading-tight
+                  break-words
 
                   ${
                     view ===
@@ -200,27 +347,53 @@ export default function TaskCard({
 
           {/* ACTIONS */}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
 
             {editing ? (
+
               <button
                 onClick={
                   handleSave
                 }
-                className="text-green-500 hover:scale-110 transition-all"
+                disabled={loading}
+                className="
+                  w-8
+                  h-8
+                  rounded-full
+                  bg-green-500/10
+                  flex
+                  items-center
+                  justify-center
+                  text-green-500
+                  hover:scale-110
+                  transition-all
+                "
               >
                 <Check
                   size={16}
                 />
               </button>
+
             ) : (
+
               <button
                 onClick={() =>
                   setEditing(
                     true
                   )
                 }
-                className="text-muted-foreground hover:text-primary transition-colors"
+                className="
+                  w-8
+                  h-8
+                  rounded-full
+                  hover:bg-primary/10
+                  flex
+                  items-center
+                  justify-center
+                  text-muted-foreground
+                  hover:text-primary
+                  transition-all
+                "
               >
                 <Pencil
                   size={16}
@@ -232,7 +405,18 @@ export default function TaskCard({
               onClick={
                 handleDelete
               }
-              className="text-muted-foreground hover:text-red-500 transition-colors"
+              className="
+                w-8
+                h-8
+                rounded-full
+                hover:bg-red-500/10
+                flex
+                items-center
+                justify-center
+                text-muted-foreground
+                hover:text-red-500
+                transition-all
+              "
             >
               <Trash2
                 size={16}
@@ -244,6 +428,7 @@ export default function TaskCard({
         {/* DESCRIPTION */}
 
         {editing ? (
+
           <textarea
             value={description}
             onChange={(e) =>
@@ -251,12 +436,30 @@ export default function TaskCard({
                 e.target.value
               )
             }
-            className="w-full min-h-[90px] bg-secondary rounded-xl px-3 py-3 outline-none text-sm resize-none mb-5"
+            className="
+              w-full
+              min-h-[90px]
+              bg-secondary/70
+              rounded-2xl
+              px-4
+              py-3
+              outline-none
+              text-sm
+              resize-none
+              border
+              border-border
+              mb-5
+            "
           />
+
         ) : (
+
           <p
             className={`
-              text-sm text-muted-foreground leading-relaxed break-words
+              text-sm
+              text-muted-foreground
+              leading-relaxed
+              break-words
 
               ${
                 view ===
@@ -265,7 +468,7 @@ export default function TaskCard({
                   : view ===
                     'grid'
                   ? 'line-clamp-5'
-                  : 'line-clamp-3'
+                  : 'line-clamp-4'
               }
 
               mb-5
@@ -275,51 +478,156 @@ export default function TaskCard({
           </p>
         )}
 
-        {/* PRIORITY */}
+        {/* TAGS */}
 
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="flex flex-wrap items-center gap-2 mb-5">
+
+          {/* PRIORITY */}
 
           <button
             onClick={
               cyclePriority
             }
-            className={`text-[10px] font-bold px-2 py-1 rounded-md border uppercase tracking-wider transition-all hover:scale-105 ${getPriorityClasses(
-              task.priority
-            )}`}
+            className={`
+              flex
+              items-center
+              gap-1
+              text-[10px]
+              font-bold
+              px-3
+              py-1.5
+              rounded-full
+              border
+              uppercase
+              tracking-wider
+              transition-all
+              hover:scale-105
+
+              ${getPriorityClasses(
+                task.priority
+              )}
+            `}
           >
+            <Flag
+              size={10}
+            />
+
             {task.priority}
           </button>
 
-          <span className="text-[10px] font-bold px-2 py-1 rounded-md border uppercase tracking-wider bg-primary/10 text-primary border-primary/20">
+          {/* STATUS */}
 
+          <span
+            className="
+              text-[10px]
+              font-bold
+              px-3
+              py-1.5
+              rounded-full
+              border
+              uppercase
+              tracking-wider
+              bg-primary/10
+              text-primary
+              border-primary/20
+            "
+          >
             {task.status}
           </span>
         </div>
 
         {/* FOOTER */}
 
-        <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/50">
+        <div
+          className="
+            flex
+            items-center
+            justify-between
+            pt-4
+            border-t
+            border-border/50
+          "
+        >
 
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          {/* DATE */}
 
+          <div
+            className="
+              flex
+              items-center
+              gap-2
+              text-xs
+              font-medium
+              text-muted-foreground
+            "
+          >
             <Calendar
               size={14}
             />
 
-            <span>
-              {task.dueDate
-                ? new Date(
-                    task.dueDate
-                  ).toLocaleDateString()
-                : 'No due date'}
-            </span>
+            <input
+              type="date"
+
+              value={dueDate}
+
+              onChange={(e) =>
+                handleDateChange(
+                  e.target.value
+                )
+              }
+
+              className="
+                bg-secondary/40
+                px-2
+                py-1
+                rounded-lg
+                outline-none
+                cursor-pointer
+                text-xs
+                border
+                border-border/40
+                hover:border-primary/40
+                transition-all
+              "
+            />
+          </div>
+
+          <div className="flex items-center -space-x-2">
+            {[task.createdBy, ...(task.collaborators || [])]
+              .filter(Boolean)
+              .filter((m, i, arr) => arr.findIndex(t => (t._id || t) === (m._id || m)) === i)
+              .filter((m) => (m._id || m) !== user?.id)
+              .map((collab, i) => (
+              <div 
+                key={collab._id || i}
+                className="w-7 h-7 rounded-full border-2 border-card bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary z-10"
+                title={collab.name || 'User'}
+              >
+                {collab.name?.charAt(0) || 'U'}
+              </div>
+            ))}
+            
+            <button
+              onClick={() => setIsInviteModalOpen(true)}
+              className="w-7 h-7 rounded-full border-2 border-card bg-secondary hover:bg-primary/20 hover:text-primary flex items-center justify-center text-muted-foreground transition-all z-20"
+              title="Add Collaborator"
+            >
+              <Plus size={12} />
+            </button>
           </div>
         </div>
       </div>
+      
+      {isInviteModalOpen && (
+        <InviteCollaboratorModal 
+          task={task} 
+          onClose={() => setIsInviteModalOpen(false)} 
+        />
+      )}
     </div>
   );
 
-  /* ================= LIST/GRID ================= */
+  /* ================= LIST / GRID ================= */
 
   if (view !== 'kanban') {
     return content;
@@ -333,17 +641,29 @@ export default function TaskCard({
       index={index}
     >
       {(provided, snapshot) => (
+
         <div
-          ref={provided.innerRef}
+          ref={
+            provided.innerRef
+          }
+
           {...provided.draggableProps}
+
           {...provided.dragHandleProps}
+
           style={{
             ...provided
-              .draggableProps.style,
+              .draggableProps
+              .style,
           }}
+
           className={
             snapshot.isDragging
-              ? 'rotate-2 z-50'
+              ? `
+                rotate-2
+                z-50
+                scale-[1.02]
+              `
               : ''
           }
         >

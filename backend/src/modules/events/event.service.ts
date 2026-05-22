@@ -1,24 +1,34 @@
-import { Event } from '../../models/Event';
+import Event from '../../models/Event';
 
-export class EventService {
-  /**
-   * Log a new event in the system
-   * @param type - The type of event (e.g., 'USER_REGISTERED')
-   * @param payload - The data associated with the event
-   * @param userId - ID of the user performing the action
-   * @param workspaceId - Optional workspace ID where the event happened
-   */
-  static async logEvent(type: string, payload: any, userId?: string, workspaceId?: string) {
-    try {
-      const event = await Event.create({
-        type,
-        payload,
-        userId,
-        workspaceId,
-      });
-      return event;
-    } catch (error) {
-      console.error(`Failed to log event: ${type}`, error);
-    }
-  }
-}
+/* ================= CREATE ================= */
+
+export const createEventService =
+  async (data: any) => {
+    return await Event.create(data);
+  };
+
+/* ================= GET ================= */
+
+export const getEventsService =
+  async (userId: string) => {
+    return await Event.find({
+      createdBy: userId,
+    }).sort({
+      date: 1,
+    });
+  };
+
+/* ================= DELETE ================= */
+
+export const deleteEventService =
+  async (
+    id: string,
+    userId: string
+  ) => {
+    return await Event.findOneAndDelete(
+      {
+        _id: id,
+        createdBy: userId,
+      }
+    );
+  };

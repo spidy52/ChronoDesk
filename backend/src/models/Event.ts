@@ -1,11 +1,72 @@
 import mongoose from 'mongoose';
 
-const eventSchema = new mongoose.Schema({
-  type: { type: String, required: true },
-  payload: { type: mongoose.Schema.Types.Mixed },
-  timestamp: { type: Date, default: Date.now },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  workspaceId: { type: mongoose.Schema.Types.ObjectId }
-});
+const eventSchema =
+  new mongoose.Schema(
+    {
+      title: {
+        type: String,
+        required: true,
+      },
 
-export const Event = mongoose.model('Event', eventSchema);
+      description: {
+        type: String,
+        default: '',
+      },
+
+      date: {
+        type: Date,
+        required: true,
+      },
+
+      startTime: {
+        type: String,
+      },
+
+      endTime: {
+        type: String,
+      },
+
+      type: {
+        type: String,
+        default: 'Meeting',
+      },
+
+      meetingLink: {
+        type: String,
+      },
+
+      workspaceId: {
+        type:
+          mongoose.Schema.Types
+            .ObjectId,
+
+        ref: 'Workspace',
+      },
+
+      createdBy: {
+        type:
+          mongoose.Schema.Types
+            .ObjectId,
+
+        ref: 'User',
+      },
+
+      attendees: [
+        {
+          type:
+            mongoose.Schema.Types
+              .ObjectId,
+
+          ref: 'User',
+        },
+      ],
+    },
+    {
+      timestamps: true,
+    }
+  );
+
+export default mongoose.model(
+  'Event',
+  eventSchema
+);

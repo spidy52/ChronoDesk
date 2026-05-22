@@ -1,24 +1,40 @@
 import {
-  Bell,
-  Mail,
   Search,
-  Filter,
   LayoutGrid,
   List,
+  LogOut,
+  Mail,
+  Check,
+  X,
+  Settings,
+  Filter,
   Columns,
   ChevronDown,
   PanelLeftClose,
-  Settings,
-  LogOut,
   User,
-  X,
 } from 'lucide-react';
+import { socket } from '../../../services/socket';
 
-import { useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 import { useAuthStore } from '../../auth/store';
+import { api } from '../../../lib/axios';
+
+interface Invitation {
+  _id: string;
+  fromUser: {
+    name: string;
+    email: string;
+  };
+  status: string;
+
+  createdAt: string;
+}
 
 export default function TopBar({
   onToggleSidebar,
@@ -31,11 +47,16 @@ export default function TopBar({
 }: {
   onToggleSidebar: () => void;
 
-  boardView: 'list' | 'grid' | 'kanban';
+  boardView:
+    | 'list'
+    | 'grid'
+    | 'kanban';
 
   setBoardView: React.Dispatch<
     React.SetStateAction<
-      'list' | 'grid' | 'kanban'
+      | 'list'
+      | 'grid'
+      | 'kanban'
     >
   >;
 
@@ -51,84 +72,207 @@ export default function TopBar({
     React.SetStateAction<string>
   >;
 }) {
+
   const { user, logout } =
     useAuthStore();
 
   const navigate = useNavigate();
+  const location = useLocation();
 
-  /* ================= DROPDOWN CONTROL ================= */
+  const isTasksRoute = location.pathname === '/dashboard' || location.pathname === '/my-tasks';
 
-  const [activeDropdown, setActiveDropdown] =
-    useState<
-      | 'notifications'
-      | 'profile'
-      | 'filters'
-      | null
-    >(null);
+  const getTitle = () => {
+    switch (location.pathname) {
+      case '/dashboard': return 'Tasks Board';
+      case '/my-tasks': return 'My Tasks';
+      case '/timesheet': return 'Timesheet';
+      case '/calendar': return 'Calendar';
+      case '/members': return 'Members';
+      case '/chats': return 'Chats';
+      default: return 'Tasks Board';
+    }
+  };
+
+  const [
+    activeDropdown,
+    setActiveDropdown,
+  ] = useState<
+    | 'mail'
+    | 'profile'
+    | 'filters'
+    | null
+  >(null);
+
+  const [
+    invitations,
+    setInvitations,
+  ] = useState<Invitation[]>([]);
+
+  const [
+    loadingInvites,
+    setLoadingInvites,
+  ] = useState(false);
+
+  /* FETCH REAL INVITATIONS */
+
+  useEffect(() => {
+
+    fetchInvitations();
+
+    const handleNewInvitation = () => {
+      fetchInvitations();
+    };
+
+    socket.on('invitation:sent', handleNewInvitation);
+
+    return () => {
+      socket.off('invitation:sent', handleNewInvitation);
+    };
+
+  }, []);
+
+  const fetchInvitations =
+    async () => {
+
+      try {
+
+        setLoadingInvites(
+          true
+        );
+
+        const response =
+          await api.get(
+            '/members/invitations'
+          );
+
+        setInvitations(
+          response.data
+        );
+
+      } catch (error) {
+
+        console.error(error);
+
+      } finally {
+
+        setLoadingInvites(
+          false
+        );
+      }
+    };
+
+  /* ACCEPT INVITATION */
+
+  const acceptInvitation =
+    async (id: string) => {
+
+      try {
+
+        await api.patch(
+          `/members/accept/${id}`
+        );
+
+        setInvitations(
+          (prev) =>
+            prev.filter(
+              (invite) =>
+                invite._id !== id
+            )
+        );
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          'Failed to accept invitation'
+        );
+      }
+    };
+
+  /* REJECT INVITATION */
+
+  const rejectInvitation =
+    async (id: string) => {
+
+      try {
+
+        await api.patch(
+          `/members/reject/${id}`
+        );
+
+        setInvitations(
+          (prev) =>
+            prev.filter(
+              (invite) =>
+                invite._id !== id
+            )
+        );
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          'Failed to reject invitation'
+        );
+      }
+    };
 
   return (
+
     <div className="relative flex items-center justify-between px-8 py-6 border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-40">
 
-      {/* ================= LEFT ================= */}
+      {/* LEFT */}
 
       <div className="flex items-center gap-5">
 
-        {/* SIDEBAR TOGGLE */}
-
         <button
-          onClick={onToggleSidebar}
+          onClick={
+            onToggleSidebar
+          }
           className="w-11 h-11 rounded-2xl border bg-card flex items-center justify-center hover:bg-secondary transition-all"
         >
-          <PanelLeftClose size={18} />
+
+          <PanelLeftClose
+            size={18}
+          />
         </button>
 
-        {/* TITLE */}
-
         <h1 className="text-3xl font-bold tracking-tight">
-
-          Tasks Board
+          {getTitle()}
         </h1>
 
         {/* SEARCH */}
+        
+        {isTasksRoute && (
+          <div className="hidden md:flex items-center bg-card border rounded-2xl px-4 py-3 w-[260px] lg:w-[320px]">
 
-        <div className="hidden md:flex items-center bg-card border rounded-2xl px-4 py-3 w-[260px] lg:w-[320px]">
-          <Search
-            size={18}
-            className="text-muted-foreground mr-3"
-          />
+            <Search
+              size={18}
+              className="text-muted-foreground mr-3"
+            />
 
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={(e) =>
-              setSearchTerm(
-                e.target.value
-              )
-            }
-            className="bg-transparent outline-none text-sm flex-1"
-          />
-        </div>
+            <input
+              type="text"
+              placeholder="Search tasks..."
+              value={searchTerm}
+              onChange={(e) =>
+                setSearchTerm(
+                  e.target.value
+                )
+              }
+              className="bg-transparent outline-none text-sm flex-1"
+            />
+          </div>
+        )}
       </div>
 
-      {/* ================= RIGHT ================= */}
+      {/* RIGHT */}
 
       <div className="flex items-center gap-4">
 
-        {/* ================= CHAT PAGE ================= */}
-
-        <button
-          onClick={() =>
-            navigate(
-              '/dashboard/chats'
-            )
-          }
-          className="w-11 h-11 rounded-full border bg-card flex items-center justify-center hover:bg-secondary transition-all"
-        >
-          <Mail size={18} />
-        </button>
-
-        {/* ================= NOTIFICATIONS ================= */}
+        {/* INVITATIONS */}
 
         <div className="relative">
 
@@ -136,29 +280,51 @@ export default function TopBar({
             onClick={() =>
               setActiveDropdown(
                 activeDropdown ===
-                  'notifications'
+                  'mail'
                   ? null
-                  : 'notifications'
+                  : 'mail'
               )
             }
             className="w-11 h-11 rounded-full border bg-card flex items-center justify-center hover:bg-secondary transition-all relative"
           >
 
-            <Bell size={18} />
+            <Mail size={18} />
 
-            <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-background"></span>
+            {invitations.length >
+              0 && (
+
+              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-semibold">
+
+                {
+                  invitations.length
+                }
+              </span>
+            )}
           </button>
 
+          {/* DROPDOWN */}
+
           {activeDropdown ===
-            'notifications' && (
-            <div className="absolute right-0 top-14 w-80 bg-card border rounded-3xl shadow-2xl p-4 z-50">
+            'mail' && (
 
-              <div className="flex items-center justify-between mb-4">
+            <div className="absolute right-0 top-14 w-[380px] bg-card border rounded-3xl shadow-2xl p-4 z-50">
 
-                <h3 className="font-bold text-lg">
+              {/* HEADER */}
 
-                  Notifications
-                </h3>
+              <div className="flex items-center justify-between mb-5">
+
+                <div>
+
+                  <h3 className="font-bold text-lg">
+
+                    Invitations
+                  </h3>
+
+                  <p className="text-xs text-muted-foreground mt-1">
+
+                    Real workspace invitations
+                  </p>
+                </div>
 
                 <button
                   onClick={() =>
@@ -166,33 +332,77 @@ export default function TopBar({
                       null
                     )
                   }
+                  className="w-8 h-8 rounded-xl hover:bg-secondary flex items-center justify-center"
                 >
-                  <X size={18} />
+
+                  <X size={16} />
                 </button>
               </div>
 
-              <div className="space-y-3">
+              {/* LIST */}
 
-                <NotificationItem
-                  title="Task moved"
-                  description="Task moved to completed"
-                />
+              <div className="space-y-4 max-h-[450px] overflow-y-auto">
 
-                <NotificationItem
-                  title="Deadline"
-                  description="Project deadline tomorrow"
-                />
+                {loadingInvites ? (
 
-                <NotificationItem
-                  title="Comment"
-                  description="New comment added"
-                />
+                  <div className="py-10 text-center text-muted-foreground text-sm">
+
+                    Loading invitations...
+                  </div>
+
+                ) : invitations.length ===
+                  0 ? (
+
+                  <div className="py-10 text-center">
+
+                    <div className="w-14 h-14 rounded-2xl bg-secondary mx-auto flex items-center justify-center mb-4">
+
+                      <Check
+                        size={22}
+                      />
+                    </div>
+
+                    <h4 className="font-semibold">
+
+                      No Invitations
+                    </h4>
+
+                    <p className="text-sm text-muted-foreground mt-1">
+
+                      You have no pending invitations
+                    </p>
+                  </div>
+
+                ) : (
+
+                  invitations.map(
+                    (
+                      invitation
+                    ) => (
+
+                      <InvitationCard
+                        key={
+                          invitation._id
+                        }
+                        invitation={
+                          invitation
+                        }
+                        onAccept={
+                          acceptInvitation
+                        }
+                        onReject={
+                          rejectInvitation
+                        }
+                      />
+                    )
+                  )
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* ================= PROFILE ================= */}
+        {/* PROFILE */}
 
         <div className="relative">
 
@@ -232,6 +442,7 @@ export default function TopBar({
 
           {activeDropdown ===
             'profile' && (
+
             <div className="absolute right-0 top-14 w-60 bg-card border rounded-3xl shadow-2xl p-2 z-50">
 
               <ProfileButton
@@ -252,7 +463,7 @@ export default function TopBar({
                 label="Settings"
                 onClick={() =>
                   navigate(
-                    '/dashboard/settings'
+                    '/settings'
                   )
                 }
               />
@@ -266,6 +477,7 @@ export default function TopBar({
                 label="Logout"
                 danger
                 onClick={() => {
+
                   logout();
 
                   navigate(
@@ -277,9 +489,10 @@ export default function TopBar({
           )}
         </div>
 
-        {/* ================= FILTERS ================= */}
+        {/* FILTER */}
 
-        <div className="relative">
+        {isTasksRoute && (
+          <div className="relative">
 
           <button
             onClick={() =>
@@ -300,6 +513,7 @@ export default function TopBar({
 
           {activeDropdown ===
             'filters' && (
+
             <div className="absolute top-14 right-0 bg-card border rounded-2xl shadow-2xl p-3 w-52 z-50">
 
               {[
@@ -307,9 +521,11 @@ export default function TopBar({
                 'medium',
                 'high',
               ].map((priority) => (
+
                 <button
                   key={priority}
                   onClick={() => {
+
                     setActiveFilter(
                       activeFilter ===
                         priority
@@ -337,10 +553,12 @@ export default function TopBar({
             </div>
           )}
         </div>
+        )}
 
-        {/* ================= VIEW SWITCHER ================= */}
+        {/* VIEW */}
 
-        <div className="flex items-center bg-secondary p-1 rounded-2xl">
+        {isTasksRoute && (
+          <div className="flex items-center bg-secondary p-1 rounded-2xl">
 
           <ViewButton
             active={
@@ -393,12 +611,13 @@ export default function TopBar({
             }
           />
         </div>
+        )}
       </div>
     </div>
   );
 }
 
-/* ================= VIEW BUTTON ================= */
+/* VIEW BUTTON */
 
 function ViewButton({
   active,
@@ -411,7 +630,9 @@ function ViewButton({
 
   icon: React.ReactNode;
 }) {
+
   return (
+
     <button
       onClick={onClick}
       className={`p-2 rounded-xl transition-all ${
@@ -420,38 +641,102 @@ function ViewButton({
           : 'text-muted-foreground hover:text-foreground'
       }`}
     >
+
       {icon}
     </button>
   );
 }
 
-/* ================= NOTIFICATION ITEM ================= */
+/* INVITATION CARD */
 
-function NotificationItem({
-  title,
-  description,
+function InvitationCard({
+  invitation,
+  onAccept,
+  onReject,
 }: {
-  title: string;
+  invitation: Invitation;
 
-  description: string;
+  onAccept: (
+    id: string
+  ) => void;
+
+  onReject: (
+    id: string
+  ) => void;
 }) {
+
   return (
-    <div className="p-4 rounded-2xl bg-secondary hover:bg-secondary/70 transition-all cursor-pointer">
 
-      <h4 className="font-semibold text-sm mb-1">
+    <div className="border rounded-2xl p-4 bg-secondary/40">
 
-        {title}
-      </h4>
+      {/* TOP */}
 
-      <p className="text-xs text-muted-foreground">
+      <div className="flex items-center gap-3 mb-4">
 
-        {description}
+        <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+
+          {invitation.fromUser?.name?.charAt(
+            0
+          )?.toUpperCase() || 'U'}
+        </div>
+
+        <div className="flex-1">
+
+          <h4 className="font-semibold text-sm">
+
+            {
+              invitation
+                .fromUser?.name || 'Unknown User'
+            }
+          </h4>
+
+          <p className="text-xs text-muted-foreground">
+
+            {
+              invitation
+                .fromUser?.email || ''
+            }
+          </p>
+        </div>
+      </div>
+
+      <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+        invited you to connect as a friend.
       </p>
+
+      {/* ACTIONS */}
+
+      <div className="flex items-center gap-3">
+
+        <button
+          onClick={() =>
+            onAccept(
+              invitation._id
+            )
+          }
+          className="flex-1 bg-primary text-primary-foreground py-2 rounded-xl text-sm font-medium hover:opacity-90 transition-all"
+        >
+
+          Accept
+        </button>
+
+        <button
+          onClick={() =>
+            onReject(
+              invitation._id
+            )
+          }
+          className="flex-1 border border-border py-2 rounded-xl text-sm font-medium hover:bg-secondary transition-all"
+        >
+
+          Reject
+        </button>
+      </div>
     </div>
   );
 }
 
-/* ================= PROFILE BUTTON ================= */
+/* PROFILE BUTTON */
 
 function ProfileButton({
   icon,
@@ -467,7 +752,9 @@ function ProfileButton({
 
   onClick?: () => void;
 }) {
+
   return (
+
     <button
       onClick={onClick}
       className={`
@@ -479,6 +766,7 @@ function ProfileButton({
         }
       `}
     >
+
       {icon}
 
       <span className="text-sm font-medium">

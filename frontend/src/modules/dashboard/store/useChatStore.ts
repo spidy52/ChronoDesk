@@ -15,6 +15,7 @@ interface User {
   name: string;
   email?: string;
   avatar?: string;
+  isOnline?: boolean;
 }
 
 export interface LastMessageType {
@@ -473,6 +474,15 @@ export const useChatStore =
       initSocket: () => {
         get().cleanupSocket();
 
+        const token = useAuthStore.getState().token;
+        if (token) {
+          socket.auth = { token };
+        }
+        
+        if (!socket.connected) {
+          socket.connect();
+        }
+
         socket.on(
           'message:received',
 
@@ -502,6 +512,40 @@ export const useChatStore =
           }
         );
 
+        socket.on('user:online', ({ userId }: { userId: string }) => {
+          set((state) => ({
+            chats: state.chats.map(chat => ({
+              ...chat,
+              participants: chat.participants.map(p => 
+                p._id === userId ? { ...p, isOnline: true } : p
+              )
+            })),
+            currentChat: state.currentChat ? {
+              ...state.currentChat,
+              participants: state.currentChat.participants.map(p => 
+                p._id === userId ? { ...p, isOnline: true } : p
+              )
+            } : null
+          }));
+        });
+        
+        socket.on('user:offline', ({ userId }: { userId: string }) => {
+          set((state) => ({
+            chats: state.chats.map(chat => ({
+              ...chat,
+              participants: chat.participants.map(p => 
+                p._id === userId ? { ...p, isOnline: false } : p
+              )
+            })),
+            currentChat: state.currentChat ? {
+              ...state.currentChat,
+              participants: state.currentChat.participants.map(p => 
+                p._id === userId ? { ...p, isOnline: false } : p
+              )
+            } : null
+          }));
+        });
+
         set({
           socketInitialized: true,
         });
@@ -529,6 +573,10 @@ export const useChatStore =
         socket.off(
           'user:offline'
         );
+
+        if (socket.connected) {
+          socket.disconnect();
+        }
       },
 
       /* ================= RESET ================= */

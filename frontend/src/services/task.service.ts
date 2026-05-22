@@ -1,14 +1,15 @@
-import axios from 'axios';
-
-const API =
-  'http://localhost:5000/api/tasks';
+import api from '../lib/axios';
 
 /* ================= GET TASKS ================= */
 
 export const fetchTasks =
-  async () => {
+  async (workspaceId?: string) => {
+    const params = workspaceId
+      ? { workspaceId }
+      : {};
+
     const { data } =
-      await axios.get(API);
+      await api.get('/tasks', { params });
 
     return data.tasks;
   };
@@ -18,8 +19,8 @@ export const fetchTasks =
 export const createTask =
   async (task: any) => {
     const { data } =
-      await axios.post(
-        API,
+      await api.post(
+        '/tasks',
         task
       );
 
@@ -34,8 +35,8 @@ export const updateTask =
     updates: any
   ) => {
     const { data } =
-      await axios.patch(
-        `${API}/${id}`,
+      await api.patch(
+        `/tasks/${id}`,
         updates
       );
 
@@ -46,7 +47,19 @@ export const updateTask =
 
 export const deleteTask =
   async (id: string) => {
-    await axios.delete(
-      `${API}/${id}`
+    await api.delete(
+      `/tasks/${id}`
     );
   };
+
+/* ================= COLLABORATORS ================= */
+
+export const addCollaborator = async (taskId: string, userId: string) => {
+  const { data } = await api.post(`/tasks/${taskId}/collaborators`, { userId });
+  return data.task;
+};
+
+export const removeCollaborator = async (taskId: string, userId: string) => {
+  const { data } = await api.delete(`/tasks/${taskId}/collaborators/${userId}`);
+  return data.task;
+};

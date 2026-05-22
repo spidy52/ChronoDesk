@@ -31,8 +31,8 @@ const ChatHeader = () => {
         {/* INFO */}
         <div>
           <h2 className="font-bold text-lg">{otherUser?.name || 'Unknown'}</h2>
-          <p className={`text-sm ${currentChat.isOnline ? 'text-green-500' : 'text-muted-foreground'}`}>
-            {currentChat.isOnline ? 'Online' : 'Offline'}
+          <p className={`text-sm ${otherUser?.isOnline ? 'text-green-500' : 'text-muted-foreground'}`}>
+            {otherUser?.isOnline ? 'Online' : 'Offline'}
           </p>
         </div>
       </div>
