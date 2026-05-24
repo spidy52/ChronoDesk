@@ -78,8 +78,8 @@ export default function WorkspaceDock() {
       </div>
 
       {/* Bottom Indicator */}
-      <div className="text-[10px] text-zinc-600 mt-6 font-semibold tracking-wider">
-        CD
+      <div className="text-[10px] text-zinc-400 mt-6 font-semibold tracking-wider">
+        ChronoDesk
       </div>
 
       {isModalOpen && (
