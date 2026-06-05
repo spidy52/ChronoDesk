@@ -9,6 +9,8 @@ import {
 import AuthLayout from './modules/auth/AuthLayout';
 import LoginPage from './modules/auth/LoginPage';
 import RegisterPage from './modules/auth/RegisterPage';
+import ForgotPasswordPage from './modules/auth/ForgotPasswordPage';
+import ResetPasswordPage from './modules/auth/ResetPasswordPage';
 
 import { useAuthStore } from './modules/auth/store';
 
@@ -80,6 +82,16 @@ function App() {
           <Route
             path="/register"
             element={<RegisterPage />}
+          />
+
+          <Route
+            path="/forgot-password"
+            element={<ForgotPasswordPage />}
+          />
+
+          <Route
+            path="/reset-password/:token"
+            element={<ResetPasswordPage />}
           />
         </Route>
 

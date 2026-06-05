@@ -48,6 +48,31 @@ export default function MembersPage() {
       role: 'Member',
     });
 
+  // Search users states inside invite modal
+  const [userQuery, setUserQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+
+  useEffect(() => {
+    if (!userQuery) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingUsers(true);
+      try {
+        const response = await api.get(`/auth/search-users?q=${userQuery}`);
+        setSearchResults(response.data);
+      } catch (err) {
+        console.error('Search users error:', err);
+      } finally {
+        setIsSearchingUsers(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userQuery]);
+
   /* FETCH MEMBERS */
 
   useEffect(() => {
@@ -322,131 +347,191 @@ export default function MembersPage() {
         {/* INVITE MODAL */}
 
         {inviteModal && (
-
-          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6">
-
-            <div className="w-full max-w-lg bg-card border rounded-3xl p-8">
-
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="w-full max-w-lg bg-card border border-border/85 rounded-3xl p-8 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
               {/* TOP */}
-
-              <div className="flex items-center justify-between mb-6">
-
+              <div className="flex items-center justify-between mb-6 shrink-0">
                 <div>
-
-                  <h2 className="text-2xl font-bold">
-                    Invite Member
-                  </h2>
-
+                  <h2 className="text-2xl font-bold">Invite Member</h2>
                   <p className="text-muted-foreground text-sm mt-1">
-                    Send workspace invitation
+                    Search and preview user before inviting
                   </p>
                 </div>
-
                 <button
-                  onClick={() =>
-                    setInviteModal(
-                      false
-                    )
-                  }
-                  className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center"
+                  onClick={() => {
+                    setInviteModal(false);
+                    setUserQuery('');
+                    setSearchResults([]);
+                    setSelectedUser(null);
+                  }}
+                  className="w-10 h-10 rounded-xl hover:bg-secondary flex items-center justify-center transition-all"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              {/* USERNAME */}
+              {/* MODAL MAIN CONTENT */}
+              <div className="flex-1 overflow-y-auto pr-1">
+                {!selectedUser ? (
+                  /* SEARCH SCREEN */
+                  <div className="space-y-5">
+                    <div>
+                      <label className="text-sm font-medium block mb-2">
+                        Search User (Name or Username)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={userQuery}
+                          onChange={(e) => setUserQuery(e.target.value)}
+                          placeholder="Type name or username..."
+                          className="w-full border bg-background border-border rounded-2xl pl-11 pr-4 py-3 outline-none focus:border-primary transition-all text-sm"
+                        />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                      </div>
+                    </div>
 
-              <div className="mb-5">
+                    {/* SEARCH RESULTS LIST */}
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                      {isSearchingUsers ? (
+                        <div className="text-center py-6 text-sm text-muted-foreground">
+                          Searching users...
+                        </div>
+                      ) : searchResults.length > 0 ? (
+                        searchResults.map((u) => (
+                          <button
+                            key={u._id}
+                            onClick={() => {
+                              setSelectedUser(u);
+                              setInviteData({
+                                ...inviteData,
+                                username: u.username,
+                              });
+                            }}
+                            className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-secondary border border-transparent hover:border-border/50 text-left transition-all group"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-semibold overflow-hidden shrink-0">
+                              {u.avatar ? (
+                                <img src={u.avatar.startsWith('/uploads') ? `http://localhost:5000${u.avatar}` : u.avatar} alt="avatar" className="w-full h-full object-cover" />
+                              ) : (
+                                u.name?.charAt(0) || 'U'
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-semibold text-sm text-foreground block truncate">{u.name}</span>
+                              <span className="text-xs text-muted-foreground block truncate">@{u.username}</span>
+                            </div>
+                            <span className="text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-all pr-2">
+                              View Profile &rarr;
+                            </span>
+                          </button>
+                        ))
+                      ) : userQuery ? (
+                        <div className="text-center py-6 text-sm text-muted-foreground">
+                          No users found matching "{userQuery}"
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 text-sm text-muted-foreground font-light">
+                          Start typing to search users...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* USER PROFILE PREVIEW CARD */
+                  <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                    <button
+                      onClick={() => setSelectedUser(null)}
+                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1.5"
+                    >
+                      &larr; Back to Search
+                    </button>
 
-                <label className="text-sm font-medium block mb-2">
-                  Username
-                </label>
+                    {/* CARD BODY */}
+                    <div className="bg-secondary/40 border border-border/50 rounded-2xl p-6 flex flex-col items-center text-center relative overflow-hidden">
+                      {/* Avatar */}
+                      <div className="w-20 h-20 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-2xl shadow-inner overflow-hidden mb-4">
+                        {selectedUser.avatar ? (
+                          <img src={selectedUser.avatar.startsWith('/uploads') ? `http://localhost:5000${selectedUser.avatar}` : selectedUser.avatar} alt="avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          selectedUser.name?.charAt(0) || 'U'
+                        )}
+                      </div>
 
-                <input
-                  type="text"
-                  value={
-                    inviteData.username
-                  }
-                  onChange={(e) =>
-                    setInviteData({
-                      ...inviteData,
-                      username:
-                        e.target
-                          .value,
-                    })
-                  }
-                  placeholder="Enter username"
-                  className="w-full border bg-background rounded-2xl px-4 py-3 outline-none"
-                />
-              </div>
+                      {/* Name & Username */}
+                      <h4 className="font-bold text-lg text-foreground">{selectedUser.name}</h4>
+                      <span className="text-xs text-primary font-semibold mb-2">@{selectedUser.username}</span>
+                      
+                      {/* Email */}
+                      <span className="text-xs text-muted-foreground font-mono bg-background px-3 py-1 rounded-full border border-border/50 mb-4">
+                        {selectedUser.email}
+                      </span>
 
-              {/* ROLE */}
+                      {/* Bio */}
+                      <div className="w-full border-t border-border/50 pt-4 mt-2 text-left">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold mb-1">Bio</span>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {selectedUser.bio || 'No bio provided.'}
+                        </p>
+                      </div>
 
-              <div className="mb-8">
+                      {/* Member Since */}
+                      <div className="w-full border-t border-border/50 pt-4 mt-4 text-left flex justify-between text-[10px] text-muted-foreground">
+                        <span>Joined ChronoDesk:</span>
+                        <span className="font-mono">
+                          {new Date(selectedUser.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
 
-                <label className="text-sm font-medium block mb-2">
-                  Role
-                </label>
-
-                <select
-                  value={
-                    inviteData.role
-                  }
-                  onChange={(e) =>
-                    setInviteData({
-                      ...inviteData,
-                      role:
-                        e.target
-                          .value,
-                    })
-                  }
-                  className="w-full border bg-background rounded-2xl px-4 py-3 outline-none"
-                >
-                  <option>
-                    Member
-                  </option>
-
-                  <option>
-                    Admin
-                  </option>
-
-                  <option>
-                    Manager
-                  </option>
-
-                  <option>
-                    Designer
-                  </option>
-
-                  <option>
-                    Developer
-                  </option>
-                </select>
+                    {/* ROLE SELECTOR */}
+                    <div>
+                      <label className="text-sm font-medium block mb-2">
+                        Select Workspace Role
+                      </label>
+                      <select
+                        value={inviteData.role}
+                        onChange={(e) =>
+                          setInviteData({
+                            ...inviteData,
+                            role: e.target.value,
+                          })
+                        }
+                        className="w-full border bg-background border-border rounded-2xl px-4 py-3 outline-none text-sm"
+                      >
+                        <option>Member</option>
+                        <option>Admin</option>
+                        <option>Manager</option>
+                        <option>Designer</option>
+                        <option>Developer</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ACTIONS */}
-
-              <div className="flex items-center gap-4">
-
+              <div className="flex items-center gap-4 mt-6 shrink-0 border-t border-border/30 pt-5">
                 <button
-                  onClick={() =>
-                    setInviteModal(
-                      false
-                    )
-                  }
-                  className="flex-1 border rounded-2xl py-3 hover:bg-secondary transition-all"
+                  onClick={() => {
+                    setInviteModal(false);
+                    setUserQuery('');
+                    setSearchResults([]);
+                    setSelectedUser(null);
+                  }}
+                  className="flex-1 border border-border rounded-2xl py-3 hover:bg-secondary text-sm font-medium transition-all"
                 >
                   Cancel
                 </button>
 
-                <button
-                  onClick={
-                    sendInvitation
-                  }
-                  className="flex-1 bg-primary text-primary-foreground rounded-2xl py-3 hover:opacity-90 transition-all"
-                >
-                  Send Invite
-                </button>
+                {selectedUser && (
+                  <button
+                    onClick={sendInvitation}
+                    className="flex-1 bg-primary text-primary-foreground rounded-2xl py-3 hover:opacity-90 text-sm font-semibold transition-all shadow-lg shadow-primary/20"
+                  >
+                    Send Invite
+                  </button>
+                )}
               </div>
             </div>
           </div>

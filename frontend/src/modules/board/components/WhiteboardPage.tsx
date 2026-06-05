@@ -4,7 +4,7 @@ import { Stage, Layer, Line, Rect, Circle, Text as KonvaText, Path, Group, Image
 import { 
   Type, Square, Circle as CircleIcon, Triangle, StickyNote, 
   Trash2, MousePointer, Edit2, Eraser, ZoomIn, ZoomOut, Maximize2, Share2, 
-  Download, ArrowLeft, Undo, Redo, Minus, ArrowUpRight
+  Download, ArrowLeft, Undo, Redo, Minus, ArrowUpRight, Clock
 } from 'lucide-react';
 
 import { useBoardStore } from '../../../store/useBoardStore';
@@ -95,6 +95,7 @@ export default function WhiteboardPage() {
   
   // Dimensions
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight - 200 });
+  const [showTimeline, setShowTimeline] = useState(true);
 
   // Drawing interactions state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -211,6 +212,18 @@ export default function WhiteboardPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [showTimeline]);
+
   // Clipboard Image Paste Support
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
@@ -318,24 +331,28 @@ export default function WhiteboardPage() {
     const worldPos = RenderingEngine.screenToWorld(pointer.x, pointer.y, camera);
 
     const clickedEl = elements.find((el) => {
-      if (el.tool === 'text' || el.tool === 'sticky') {
-        return DrawingEngine.intersectsBox(worldPos.x, worldPos.y, el);
+      if (el.tool === 'pencil' || el.tool === 'marker') {
+        return DrawingEngine.intersectsStroke(worldPos.x, worldPos.y, el as any);
       }
-      return false;
+      return DrawingEngine.intersectsBox(worldPos.x, worldPos.y, el);
     });
 
     if (clickedEl) {
       setSelectedIds([clickedEl.id]);
       
-      const screenPos = RenderingEngine.worldToScreen(clickedEl.x, clickedEl.y, camera);
-      setTextInput({
-        x: screenPos.x,
-        y: screenPos.y - 15,
-        wx: clickedEl.x,
-        wy: clickedEl.y,
-        elementId: clickedEl.id,
-      });
-      setTextVal((clickedEl as any).text || '');
+      if (clickedEl.tool === 'text' || clickedEl.tool === 'sticky') {
+        const screenPos = RenderingEngine.worldToScreen(clickedEl.x, clickedEl.y, camera);
+        setTextInput({
+          x: screenPos.x,
+          y: screenPos.y - 15,
+          wx: clickedEl.x,
+          wy: clickedEl.y,
+          elementId: clickedEl.id,
+        });
+        setTextVal((clickedEl as any).text || '');
+      }
+    } else {
+      setSelectedIds([]);
     }
   };
 
@@ -384,11 +401,15 @@ export default function WhiteboardPage() {
       });
 
       if (clickedEl) {
-        setSelectedIds([clickedEl.id]);
-        
-        // Setup dragging parameters for item movement
-        setDragStart({ x: worldPos.x, y: worldPos.y });
-        setHasDragged(false);
+        if (selectedIds.includes(clickedEl.id)) {
+          // Setup dragging parameters for item movement if already selected
+          setDragStart({ x: worldPos.x, y: worldPos.y });
+          setHasDragged(false);
+        } else {
+          // Single click on a non-selected item unselects everything (double click to select)
+          setSelectedIds([]);
+          setDragStart(null);
+        }
       } else {
         setSelectedIds([]);
         // Start dragging lasso selection rectangle
@@ -515,12 +536,14 @@ export default function WhiteboardPage() {
     if (isReplayMode) return;
 
     // 0. Finalize Dragging an element (commit final position to DB)
-    if (activeTool === 'select' && selectedIds.length > 0 && hasDragged) {
-      const targetId = selectedIds[0]!;
-      const el = elements.find((e) => e.id === targetId);
-      if (el) {
-        RealtimeEngine.commitElement('UPDATE_ELEMENT', el);
-        SnapshotEngine.logEvent();
+    if (activeTool === 'select' && selectedIds.length > 0) {
+      if (hasDragged) {
+        const targetId = selectedIds[0]!;
+        const el = elements.find((e) => e.id === targetId);
+        if (el) {
+          RealtimeEngine.commitElement('UPDATE_ELEMENT', el);
+          SnapshotEngine.logEvent();
+        }
       }
       setHasDragged(false);
       setDragStart(null);
@@ -986,6 +1009,14 @@ export default function WhiteboardPage() {
           {/* Exports drop downs */}
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowTimeline(!showTimeline)}
+              className={`px-3 py-1.5 text-xs rounded-xl border ${showTimeline ? (isDark ? 'bg-blue-600/20 border-blue-500/30 text-blue-400' : 'bg-blue-50 border-blue-200 text-blue-600') : (isDark ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white' : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700 hover:text-black')} font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95`}
+              title={showTimeline ? "Hide Timeline Scrubber" : "Show Timeline Scrubber"}
+            >
+              <Clock size={13} />
+              {showTimeline ? "Hide Timeline" : "Show Timeline"}
+            </button>
+            <button
               onClick={handleExportPNG}
               className={`px-3 py-1.5 text-xs rounded-xl border ${isDark ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white' : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700 hover:text-black'} font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95`}
               title="Export as PNG image"
@@ -1036,6 +1067,17 @@ export default function WhiteboardPage() {
             }
             if (e.key === 'Delete' || e.key === 'Backspace') {
               handleDeleteSelected();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+              e.preventDefault();
+              if (e.shiftKey) {
+                RealtimeEngine.redo();
+              } else {
+                RealtimeEngine.undo();
+              }
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+              e.preventDefault();
+              RealtimeEngine.redo();
             }
           }}
         >
@@ -1601,7 +1643,7 @@ export default function WhiteboardPage() {
       </div>
 
       {/* 3. BOTTOM TIMELINE SCRUBBER */}
-      {board && (
+      {board && showTimeline && (
         <TimelineScrubber 
           boardId={board._id} 
           onScrubRelease={handleScrubRelease} 

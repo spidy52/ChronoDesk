@@ -24,6 +24,8 @@ interface AuthState {
 
   loadUser: () => void;
 
+  updateUser: (user: User) => void;
+
   logout: () => void;
 }
 
@@ -90,6 +92,11 @@ export const useAuthStore =
       }
     },
 
+    updateUser: (user: User) => {
+      localStorage.setItem('user', JSON.stringify(user));
+      set({ user });
+    },
+
     logout: () => {
       localStorage.removeItem(
         'token'
@@ -97,6 +104,10 @@ export const useAuthStore =
 
       localStorage.removeItem(
         'user'
+      );
+
+      localStorage.removeItem(
+        'activeWorkspaceId'
       );
 
       set({

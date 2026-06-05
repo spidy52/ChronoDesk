@@ -48,7 +48,7 @@ interface WorkspaceStore {
 
 export const useWorkspaceStore =
   create<WorkspaceStore>(
-    (set, get) => ({
+    (set) => ({
       workspaces: [],
 
       activeWorkspace: null,
@@ -71,15 +71,35 @@ export const useWorkspaceStore =
               workspaces,
             });
 
-            // Set first workspace as active if none is set
-            if (
-              !get().activeWorkspace &&
-              workspaces.length > 0
-            ) {
+            const savedId = localStorage.getItem('activeWorkspaceId');
+            if (savedId === 'personal') {
               set({
-                activeWorkspace:
-                  workspaces[0],
+                activeWorkspace: null,
               });
+            } else if (savedId) {
+              const matched = workspaces.find((ws: any) => ws._id === savedId);
+              if (matched) {
+                set({
+                  activeWorkspace: matched,
+                });
+              } else {
+                set({
+                  activeWorkspace: null,
+                });
+                localStorage.setItem('activeWorkspaceId', 'personal');
+              }
+            } else {
+              if (workspaces.length > 0) {
+                set({
+                  activeWorkspace: workspaces[0],
+                });
+                localStorage.setItem('activeWorkspaceId', workspaces[0]._id);
+              } else {
+                set({
+                  activeWorkspace: null,
+                });
+                localStorage.setItem('activeWorkspaceId', 'personal');
+              }
             }
           } catch (error) {
             console.error(error);
@@ -99,6 +119,11 @@ export const useWorkspaceStore =
           activeWorkspace:
             workspace,
         });
+        if (workspace === null) {
+          localStorage.setItem('activeWorkspaceId', 'personal');
+        } else {
+          localStorage.setItem('activeWorkspaceId', workspace._id);
+        }
       },
 
       /* ================= CREATE ================= */
@@ -165,18 +190,22 @@ export const useWorkspaceStore =
               id
             );
 
-            set((state) => ({
-              workspaces:
-                state.workspaces.filter(
-                  (ws) => ws._id !== id
-                ),
+            set((state) => {
+              const nextWorkspaces = state.workspaces.filter(
+                (ws) => ws._id !== id
+              );
+              let nextActive = state.activeWorkspace;
+              
+              if (state.activeWorkspace?._id === id) {
+                nextActive = null;
+                localStorage.setItem('activeWorkspaceId', 'personal');
+              }
 
-              activeWorkspace:
-                state.activeWorkspace?._id ===
-                id
-                  ? null
-                  : state.activeWorkspace,
-            }));
+              return {
+                workspaces: nextWorkspaces,
+                activeWorkspace: nextActive,
+              };
+            });
           } catch (error) {
             console.error(error);
           }

@@ -28,15 +28,31 @@ class RealtimeEngineClass {
   constructor() {
     this.yDoc = new Y.Doc();
     this.yElements = this.yDoc.getMap('elements');
-    this.undoManager = new Y.UndoManager(this.yElements);
+    this.undoManager = new Y.UndoManager(this.yElements, {
+      trackedOrigins: new Set([null, undefined]),
+    });
 
     // Watch Yjs Map changes to update our Zustand local store
-    this.yElements.observe(() => {
+    this.yElements.observe((event) => {
       // Avoid overwriting store if we are in historical replay review mode
       const { isReplayMode } = useBoardStore.getState();
       if (!isReplayMode) {
         const els = Array.from(this.yElements.values()) as BoardElement[];
         useBoardStore.getState().setElements(els);
+      }
+
+      // If the changes came from the UndoManager, we must persist them to MongoDB
+      if (event.transaction.origin === this.undoManager) {
+        event.changes.keys.forEach((change, key) => {
+          if (change.action === 'add' || change.action === 'update') {
+            const el = this.yElements.get(key);
+            if (el) {
+              this.commitUndoRedoDbChange('UPDATE_ELEMENT', el);
+            }
+          } else if (change.action === 'delete') {
+            this.commitUndoRedoDbChange('DELETE_ELEMENT', { id: key } as BoardElement);
+          }
+        });
       }
     });
 
@@ -202,6 +218,14 @@ class RealtimeEngineClass {
     // 9. Element commits (finalized shapes/strokes)
     socket.on('element:commit-success', (boardEvent) => {
       TimelineEngine.addEvent(boardEvent);
+
+      // If the event was committed by us, we already applied it locally under a null/local origin.
+      // Re-applying it under a 'socket' origin would clear the local history from our UndoManager.
+      const currentUserId = useAuthStore.getState().user?.id || useAuthStore.getState().user?._id;
+      if (boardEvent.userId === currentUserId) {
+        return;
+      }
+
       // Reconcile and apply to Yjs element model under 'socket' origin to prevent loop echo
       const el = boardEvent.data;
       this.yDoc.transact(() => {
@@ -250,7 +274,9 @@ class RealtimeEngineClass {
    * Update Yjs map locally only (propagating to peers in real-time but bypassing DB commit)
    */
   public updateElementLocally(element: BoardElement) {
-    this.yElements.set(element.id, element);
+    this.yDoc.transact(() => {
+      this.yElements.set(element.id, element);
+    }, 'drag');
   }
 
   /**
@@ -292,6 +318,14 @@ class RealtimeEngineClass {
     if (this.undoManager.canRedo()) {
       this.undoManager.redo();
     }
+  }
+
+  private commitUndoRedoDbChange(type: 'CREATE_ELEMENT' | 'UPDATE_ELEMENT' | 'DELETE_ELEMENT', element: BoardElement) {
+    socket.emit('element:commit', {
+      type,
+      timestamp: Date.now(),
+      data: element,
+    });
   }
 }
 

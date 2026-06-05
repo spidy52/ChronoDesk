@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
         username: {
       type: String,
@@ -26,6 +28,11 @@ const userSchema = new mongoose.Schema(
     },
 
     avatar: {
+      type: String,
+      default: '',
+    },
+
+    bio: {
       type: String,
       default: '',
     },
