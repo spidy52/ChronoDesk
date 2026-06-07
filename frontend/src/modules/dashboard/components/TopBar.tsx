@@ -114,22 +114,6 @@ export default function TopBar({
 
   /* FETCH REAL INVITATIONS */
 
-  useEffect(() => {
-
-    fetchInvitations();
-
-    const handleNewInvitation = () => {
-      fetchInvitations();
-    };
-
-    socket.on('invitation:sent', handleNewInvitation);
-
-    return () => {
-      socket.off('invitation:sent', handleNewInvitation);
-    };
-
-  }, []);
-
   const fetchInvitations =
     async () => {
 
@@ -159,6 +143,22 @@ export default function TopBar({
         );
       }
     };
+
+  useEffect(() => {
+
+    fetchInvitations();
+
+    const handleNewInvitation = () => {
+      fetchInvitations();
+    };
+
+    socket.on('invitation:sent', handleNewInvitation);
+
+    return () => {
+      socket.off('invitation:sent', handleNewInvitation);
+    };
+
+  }, []);
 
   /* ACCEPT INVITATION */
 
