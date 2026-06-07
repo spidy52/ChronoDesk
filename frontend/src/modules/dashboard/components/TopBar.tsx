@@ -145,8 +145,10 @@ export default function TopBar({
     };
 
   useEffect(() => {
-
-    fetchInvitations();
+    // Fetch invitations on next tick to avoid synchronous setState warnings
+    const timer = setTimeout(() => {
+      fetchInvitations();
+    }, 0);
 
     const handleNewInvitation = () => {
       fetchInvitations();
@@ -155,6 +157,7 @@ export default function TopBar({
     socket.on('invitation:sent', handleNewInvitation);
 
     return () => {
+      clearTimeout(timer);
       socket.off('invitation:sent', handleNewInvitation);
     };
 
