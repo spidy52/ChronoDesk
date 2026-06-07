@@ -484,18 +484,20 @@ function TaskRow({
     <div
       className="
         grid
+        grid-cols-2
         md:grid-cols-5
         gap-4
         px-6
         py-5
         hover:bg-secondary/30
         transition-all
+        items-center
       "
     >
 
       {/* TASK */}
 
-      <div className="font-semibold">
+      <div className="font-semibold col-span-2 md:col-span-1">
 
         {task.title}
 
@@ -507,8 +509,8 @@ function TaskRow({
 
       {/* PRIORITY */}
 
-      <div>
-
+      <div className="flex md:block items-center gap-2">
+        <span className="text-xs text-muted-foreground md:hidden font-medium">Priority:</span>
         <span
           className={`
             px-3
@@ -526,8 +528,8 @@ function TaskRow({
 
       {/* STATUS */}
 
-      <div>
-
+      <div className="flex md:block items-center gap-2">
+        <span className="text-xs text-muted-foreground md:hidden font-medium">Status:</span>
         <span
           className={`
             px-3
@@ -545,18 +547,20 @@ function TaskRow({
 
       {/* DATE */}
 
-      <div className="text-sm text-muted-foreground">
-
-        {task.dueDate
-          ? new Date(
-              task.dueDate
-            ).toLocaleDateString()
-          : 'No due date'}
+      <div className="text-sm text-muted-foreground flex md:block items-center gap-2 col-span-2 md:col-span-1">
+        <span className="text-xs text-muted-foreground md:hidden font-medium">Due:</span>
+        <span>
+          {task.dueDate
+            ? new Date(
+                task.dueDate
+              ).toLocaleDateString()
+            : 'No due date'}
+        </span>
       </div>
 
       {/* ACTIONS */}
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-end gap-3 col-span-2 md:col-span-1 border-t md:border-t-0 pt-3 md:pt-0 border-border/50">
 
         <button
           onClick={() =>
@@ -572,6 +576,7 @@ function TaskRow({
             items-center
             justify-center
             transition-all
+            ml-auto md:ml-0
           "
         >
           <Trash2 size={16} />

@@ -14,21 +14,19 @@ export default function DashboardLayout({
   children: React.ReactNode;
   fullHeight?: boolean;
 }) {
-  const { initSocket, cleanupSocket, socketInitialized } = useChatStore();
+  const { initSocket, cleanupSocket } = useChatStore();
   const { setupTaskSocketListeners } = useTaskStore();
 
   useEffect(() => {
-    if (!socketInitialized) {
-      initSocket();
-    }
+    initSocket();
     setupTaskSocketListeners();
     return () => cleanupSocket();
-  }, [initSocket, cleanupSocket, socketInitialized, setupTaskSocketListeners]);
+  }, [initSocket, cleanupSocket, setupTaskSocketListeners]);
 
   /* ---------------- SIDEBAR ---------------- */
 
   const [sidebarOpen, setSidebarOpen] =
-    useState(true);
+    useState(() => window.innerWidth >= 768);
 
   /* ---------------- BOARD VIEW ---------------- */
 
@@ -46,7 +44,7 @@ export default function DashboardLayout({
   const [searchTerm, setSearchTerm] = useState('');
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground relative">
 
       {/* ================= WORKSPACE DOCK ================= */}
 
@@ -55,6 +53,14 @@ export default function DashboardLayout({
       {/* ================= SIDEBAR ================= */}
 
       <Sidebar isOpen={sidebarOpen} />
+
+      {/* Backdrop for mobile overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-10 md:hidden backdrop-blur-[2px]"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* ================= MAIN CONTENT ================= */}
 

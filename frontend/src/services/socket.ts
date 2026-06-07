@@ -1,7 +1,8 @@
 import { io } from 'socket.io-client';
+import { BACKEND_URL } from '@/config';
 
 export const socket = io(
-  'http://localhost:5000',
+  BACKEND_URL,
   {
     autoConnect: false,
     withCredentials: true,

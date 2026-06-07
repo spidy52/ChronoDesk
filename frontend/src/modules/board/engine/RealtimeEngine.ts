@@ -116,6 +116,7 @@ class RealtimeEngineClass {
     
     this.currentBoardId = null;
     this.yElements.clear();
+    this.undoManager.clear();
     useBoardStore.getState().setSyncStatus('disconnected');
     useBoardStore.getState().updateCollaborators({});
   }
@@ -222,7 +223,7 @@ class RealtimeEngineClass {
       // If the event was committed by us, we already applied it locally under a null/local origin.
       // Re-applying it under a 'socket' origin would clear the local history from our UndoManager.
       const currentUserId = useAuthStore.getState().user?.id || useAuthStore.getState().user?._id;
-      if (boardEvent.userId === currentUserId) {
+      if (currentUserId && String(boardEvent.userId) === String(currentUserId)) {
         return;
       }
 

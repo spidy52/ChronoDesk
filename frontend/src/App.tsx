@@ -20,7 +20,6 @@ import WhiteboardPage from './modules/board/components/WhiteboardPage';
 import MyTasksPage from './modules/dashboard/pages/MyTasksPage';
 
 import CalendarPage from './modules/dashboard/pages/CalendarPage';
-import TimesheetPage from './modules/dashboard/pages/TimesheetPage';
 import MembersPage from './modules/dashboard/pages/MembersPage';
 import ChatsPage from './modules/dashboard/pages/ChatsPage';
 import SettingsPage from './modules/dashboard/pages/SettingsPage';
@@ -136,15 +135,7 @@ function App() {
           }
         />
 
-        {/* TIMESHEET */}
-        <Route
-          path="/timesheet"
-          element={
-            <ProtectedRoute>
-              <TimesheetPage />
-            </ProtectedRoute>
-          }
-        />
+
 
         {/* MEMBERS */}
         <Route

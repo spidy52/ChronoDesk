@@ -117,7 +117,7 @@ const ChatSidebar = () => {
   }
 
   return (
-    <aside className="w-[360px] bg-card border-r flex flex-col h-full">
+    <aside className={`w-full md:w-[360px] bg-card border-r flex flex-col h-full ${currentChat ? 'hidden md:flex' : 'flex'}`}>
 
       {/* HEADER */}
       <div className="h-16 flex items-center justify-between px-5 border-b">

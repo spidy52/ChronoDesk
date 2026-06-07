@@ -85,7 +85,6 @@ export default function TopBar({
     switch (location.pathname) {
       case '/dashboard': return 'Tasks Board';
       case '/my-tasks': return 'My Tasks';
-      case '/timesheet': return 'Timesheet';
       case '/calendar': return 'Calendar';
       case '/members': return 'Members';
       case '/chats': return 'Chats';
@@ -221,25 +220,26 @@ export default function TopBar({
 
   return (
 
-    <div className="relative flex items-center justify-between px-8 py-6 border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-40">
+    <div className="relative flex items-center justify-between px-4 py-3 md:px-8 md:py-6 border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-40">
 
       {/* LEFT */}
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-2 md:gap-5">
 
         <button
           onClick={
             onToggleSidebar
           }
-          className="w-11 h-11 rounded-2xl border bg-card flex items-center justify-center hover:bg-secondary transition-all"
+          className="w-9 h-9 md:w-11 md:h-11 rounded-xl md:rounded-2xl border bg-card flex items-center justify-center hover:bg-secondary transition-all"
         >
 
           <PanelLeftClose
-            size={18}
+            size={16}
+            className="md:w-[18px] md:h-[18px]"
           />
         </button>
 
-        <h1 className="text-3xl font-bold tracking-tight">
+        <h1 className="text-lg md:text-3xl font-bold tracking-tight">
           {getTitle()}
         </h1>
 
@@ -285,10 +285,10 @@ export default function TopBar({
                   : 'mail'
               )
             }
-            className="w-11 h-11 rounded-full border bg-card flex items-center justify-center hover:bg-secondary transition-all relative"
+            className="w-9 h-9 md:w-11 md:h-11 rounded-full border bg-card flex items-center justify-center hover:bg-secondary transition-all relative"
           >
 
-            <Mail size={18} />
+            <Mail size={16} className="md:w-[18px] md:h-[18px]" />
 
             {invitations.length >
               0 && (
@@ -415,10 +415,10 @@ export default function TopBar({
                   : 'profile'
               )
             }
-            className="flex items-center gap-3 bg-card border rounded-full pl-2 pr-4 py-2 hover:bg-secondary transition-all"
+            className="flex items-center gap-1 bg-card border rounded-full p-1.5 md:pl-2 md:pr-4 md:py-2 hover:bg-secondary transition-all"
           >
 
-            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
+            <div className="w-6 h-6 md:w-9 md:h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-[10px] md:text-sm">
 
               {user?.name?.charAt(
                 0
@@ -429,14 +429,15 @@ export default function TopBar({
                 'U'}
             </div>
 
-            <span className="font-medium text-sm">
+            <span className="hidden md:inline font-medium text-sm">
 
               {user?.name ||
                 'User'}
             </span>
 
             <ChevronDown
-              size={16}
+              size={14}
+              className="hidden md:block"
             />
           </button>
 
@@ -503,10 +504,10 @@ export default function TopBar({
                   : 'filters'
               )
             }
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground px-3 py-2 rounded-xl hover:bg-secondary transition-all"
+            className="flex items-center gap-1 md:gap-2 text-sm font-medium text-muted-foreground hover:text-foreground p-2 md:px-3 md:py-2 rounded-xl hover:bg-secondary transition-all"
           >
 
-            Filter
+            <span className="hidden md:inline">Filter</span>
 
             <Filter size={16} />
           </button>
@@ -558,7 +559,7 @@ export default function TopBar({
         {/* VIEW */}
 
         {isTasksRoute && (
-          <div className="flex items-center bg-secondary p-1 rounded-2xl">
+          <div className="flex items-center bg-secondary p-0.5 md:p-1 rounded-xl md:rounded-2xl">
 
           <ViewButton
             active={
@@ -635,7 +636,7 @@ function ViewButton({
 
     <button
       onClick={onClick}
-      className={`p-2 rounded-xl transition-all ${
+      className={`p-1.5 md:p-2 rounded-lg md:rounded-xl transition-all ${
         active
           ? 'bg-background shadow-sm text-foreground'
           : 'text-muted-foreground hover:text-foreground'

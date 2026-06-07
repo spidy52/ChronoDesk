@@ -25,9 +25,15 @@ connectDB();
 
 /* ================= SOCKET ================= */
 
+const clientUrl = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map((url) => url.trim())
+  : 'http://localhost:5173';
+
+/* ================= SOCKET ================= */
+
 export const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: clientUrl,
     credentials: true,
   },
 });
@@ -36,7 +42,7 @@ export const io = new Server(server, {
 
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin: clientUrl,
     credentials: true,
   })
 );

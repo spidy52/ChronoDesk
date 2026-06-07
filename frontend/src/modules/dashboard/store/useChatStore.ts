@@ -357,25 +357,54 @@ export const useChatStore =
               response.message;
 
             set(
-              (state) => ({
-                messages:
-                  {
-                    ...state.messages,
+              (state) => {
+                const chatMessages = state.messages[chatId] || [];
+                const updatedMessages = chatMessages.map((m) =>
+                  m._id === tempId ? serverMessage : m
+                );
 
-                    [chatId]:
-                      state.messages[
-                        chatId
-                      ].map(
-                        (
-                          m
-                        ) =>
-                          m._id ===
-                          tempId
-                            ? serverMessage
-                            : m
-                      ),
+                const updatedChats = state.chats.map((chat) => {
+                  if (chat._id === chatId) {
+                    return {
+                      ...chat,
+                      lastMessage: {
+                        content: serverMessage.content,
+                        senderId: serverMessage.senderId,
+                        createdAt: serverMessage.createdAt,
+                        readAt: serverMessage.readAt,
+                        deliveredAt: serverMessage.deliveredAt,
+                      },
+                    };
+                  }
+                  return chat;
+                });
+
+                const sortedChats = [...updatedChats].sort(
+                  (a, b) =>
+                    +new Date(b.lastMessage?.createdAt || b.updatedAt) -
+                    +new Date(a.lastMessage?.createdAt || a.updatedAt)
+                );
+
+                return {
+                  messages: {
+                    ...state.messages,
+                    [chatId]: updatedMessages,
                   },
-              })
+                  chats: sortedChats,
+                  currentChat: state.currentChat?._id === chatId
+                    ? {
+                        ...state.currentChat,
+                        lastMessage: {
+                          content: serverMessage.content,
+                          senderId: serverMessage.senderId,
+                          createdAt: serverMessage.createdAt,
+                          readAt: serverMessage.readAt,
+                          deliveredAt: serverMessage.deliveredAt,
+                        },
+                      }
+                    : state.currentChat,
+                };
+              }
             );
           }
         );
@@ -490,24 +519,54 @@ export const useChatStore =
             message: Message
           ) => {
             set(
-              (state) => ({
-                messages:
-                  {
+              (state) => {
+                const chatMessages = state.messages[message.chatId] || [];
+                const updatedMessages = [...chatMessages, message];
+
+                const updatedChats = state.chats.map((chat) => {
+                  if (chat._id === message.chatId) {
+                    const isCurrent = state.currentChat?._id === message.chatId;
+                    return {
+                      ...chat,
+                      lastMessage: {
+                        content: message.content,
+                        senderId: message.senderId,
+                        createdAt: message.createdAt,
+                        readAt: message.readAt,
+                        deliveredAt: message.deliveredAt,
+                      },
+                      unreadCount: isCurrent ? 0 : (chat.unreadCount || 0) + 1,
+                    };
+                  }
+                  return chat;
+                });
+
+                const sortedChats = [...updatedChats].sort(
+                  (a, b) =>
+                    +new Date(b.lastMessage?.createdAt || b.updatedAt) -
+                    +new Date(a.lastMessage?.createdAt || a.updatedAt)
+                );
+
+                return {
+                  messages: {
                     ...state.messages,
-
-                    [message.chatId]:
-                      [
-                        ...(state
-                          .messages[
-                          message
-                            .chatId
-                        ] ||
-                          []),
-
-                        message,
-                      ],
+                    [message.chatId]: updatedMessages,
                   },
-              })
+                  chats: sortedChats,
+                  currentChat: state.currentChat?._id === message.chatId
+                    ? {
+                        ...state.currentChat,
+                        lastMessage: {
+                          content: message.content,
+                          senderId: message.senderId,
+                          createdAt: message.createdAt,
+                          readAt: message.readAt,
+                          deliveredAt: message.deliveredAt,
+                        },
+                      }
+                    : state.currentChat,
+                };
+              }
             );
           }
         );
@@ -577,6 +636,10 @@ export const useChatStore =
         if (socket.connected) {
           socket.disconnect();
         }
+
+        set({
+          socketInitialized: false,
+        });
       },
 
       /* ================= RESET ================= */

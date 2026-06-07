@@ -1,4 +1,4 @@
-export type BoardTool = 'select' | 'pencil' | 'marker' | 'eraser' | 'lasso' | 'text' | 'rect' | 'circle' | 'triangle' | 'sticky' | 'image' | 'line' | 'arrow';
+export type BoardTool = 'select' | 'pencil' | 'marker' | 'eraser' | 'lasso' | 'text' | 'rect' | 'circle' | 'triangle' | 'sticky' | 'image' | 'line' | 'arrow' | 'pan';
 
 export interface BaseElement {
   id: string;

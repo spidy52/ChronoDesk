@@ -16,6 +16,7 @@ import { useAuthStore } from '../../auth/store';
 import DashboardLayout from '../../../layouts/DashboardLayout';
 import { useUIStore } from '../../../store/useUIStore';
 import { api } from '../../../lib/axios';
+import { BACKEND_URL } from '@/config';
 
 export default function SettingsPage() {
   const { user, updateUser, logout } = useAuthStore();
@@ -222,7 +223,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-6">
                   <div className="w-24 h-24 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-3xl shadow-inner overflow-hidden shrink-0">
                     {avatar ? (
-                      <img src={avatar.startsWith('/uploads') ? `http://localhost:5000${avatar}` : avatar} alt="avatar" className="w-full h-full object-cover" />
+                      <img src={avatar.startsWith('/uploads') ? `${BACKEND_URL}${avatar}` : avatar} alt="avatar" className="w-full h-full object-cover" />
                     ) : (
                       user?.name?.charAt(0) || 'U'
                     )}
@@ -270,7 +271,7 @@ export default function SettingsPage() {
                 )}
 
                 <div className="space-y-5">
-                  <div className="grid grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                       <label className="text-sm font-medium text-muted-foreground block mb-2">First Name</label>
                       <input
@@ -386,7 +387,7 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Language & Region */}
-                  <div className="grid grid-cols-2 gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                       <label className="text-sm font-medium text-muted-foreground block mb-2">Language</label>
                       <select
@@ -518,7 +519,7 @@ export default function SettingsPage() {
                           className="w-full bg-background border border-border rounded-xl px-4 py-3 outline-none focus:border-primary transition-all text-sm"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
                           <label className="text-sm font-medium text-muted-foreground block mb-2">New Password</label>
                           <input

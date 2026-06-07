@@ -1,7 +1,6 @@
 import {
   LayoutList,
   CheckSquare,
-  Clock,
   Calendar,
   Users,
   MessageSquare,
@@ -9,6 +8,7 @@ import {
   Settings,
   LogOut,
   Trash2,
+  Home,
 } from 'lucide-react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -23,7 +23,7 @@ export default function Sidebar({
   isOpen: boolean;
 }) {
   const { user, logout } = useAuthStore();
-  const { activeWorkspace } = useWorkspaceStore();
+  const { activeWorkspace, workspaces, setActiveWorkspace } = useWorkspaceStore();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   const navigate = useNavigate();
@@ -46,11 +46,6 @@ export default function Sidebar({
       path: '/my-tasks',
     },
     {
-      label: 'Timesheet',
-      icon: <Clock size={18} />,
-      path: '/timesheet',
-    },
-    {
       label: 'Calendar',
       icon: <Calendar size={18} />,
       path: '/calendar',
@@ -71,6 +66,7 @@ export default function Sidebar({
     <div
       className={`
         transition-all duration-300 overflow-hidden
+        fixed md:relative left-0 top-0 bottom-0
         ${
           isOpen
             ? 'w-72 opacity-100'
@@ -114,6 +110,52 @@ export default function Sidebar({
 
       {/* NAVIGATION */}
       <div className="flex-1 py-6 px-4 overflow-y-auto">
+
+        {/* WORKSPACES (DASHBOARDS) - MOBILE ONLY */}
+        <div className="md:hidden mb-6">
+          <h3 className="text-xs uppercase tracking-widest text-muted-foreground px-4 mb-3 font-semibold">
+            Dashboards
+          </h3>
+          <div className="space-y-1">
+            {/* Personal Home */}
+            <button
+              onClick={() => {
+                setActiveWorkspace(null);
+                navigate('/dashboard');
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                activeWorkspace === null
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'text-muted-foreground hover:bg-secondary'
+              }`}
+            >
+              <Home size={16} />
+              <span>Personal Home</span>
+            </button>
+            
+            {/* Workspaces list */}
+            {workspaces.map((workspace) => (
+              <button
+                key={workspace._id}
+                onClick={() => {
+                  setActiveWorkspace(workspace);
+                  navigate('/dashboard');
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  activeWorkspace?._id === workspace._id
+                    ? 'bg-primary/10 text-primary border border-primary/20'
+                    : 'text-muted-foreground hover:bg-secondary'
+                }`}
+              >
+                <div className="w-5 h-5 rounded-md bg-primary/20 flex items-center justify-center text-[10px] font-bold">
+                  {workspace.name.substring(0, 2).toUpperCase()}
+                </div>
+                <span>{workspace.name}</span>
+              </button>
+            ))}
+          </div>
+          <div className="h-px bg-border/50 my-4"></div>
+        </div>
 
         <div className="space-y-2">
 

@@ -5,12 +5,14 @@ import { TimelineEngine } from '../engine/TimelineEngine';
 import { RealtimeEngine } from '../engine/RealtimeEngine';
 import { useUIStore } from '../../../store/useUIStore';
 
+import { BACKEND_URL } from '@/config';
+
 const getFullUrl = (url: string) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
-  return `http://localhost:5000${url}`;
+  return `${BACKEND_URL}${url}`;
 };
 
 interface TimelineScrubberProps {
@@ -63,6 +65,45 @@ export default function TimelineScrubber({ boardId, onScrubRelease }: TimelineSc
   // Time boundaries helper
   const totalDuration = Math.max(1000, boardEndTime - boardStartTime);
   const currentPercentage = Math.min(100, Math.max(0, ((replayTime - boardStartTime) / totalDuration) * 100));
+
+  // Generate equal slots across the timeline to render like a video filmstrip
+  const generateFilmstripSlots = () => {
+    // We want each frame to represent a 10-second block if possible,
+    // but if the timeline is very long, we scale the block size so we don't render too many images.
+    const baseSlotDuration = 10000; // 10 seconds
+    let slotDuration = baseSlotDuration;
+    
+    let numSlots = Math.ceil(totalDuration / slotDuration);
+    
+    // Cap at 12 slots to prevent rendering too many images and lagging the browser
+    if (numSlots > 12) {
+      numSlots = 12;
+      slotDuration = totalDuration / numSlots;
+    }
+    
+    const slots: any[] = [];
+    for (let i = 0; i < numSlots; i++) {
+      const slotTime = boardStartTime + i * slotDuration + slotDuration / 2;
+      
+      // Find the closest frame to this slot's time
+      let closestFrame = null;
+      let minDiff = Infinity;
+      
+      timelineFrames.forEach((frame) => {
+        const diff = Math.abs(frame.timestamp - slotTime);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestFrame = frame;
+        }
+      });
+      
+      slots.push({
+        time: slotTime,
+        frame: closestFrame,
+      });
+    }
+    return slots;
+  };
 
   // Playback toggling
   const handlePlayToggle = () => {
@@ -177,7 +218,7 @@ export default function TimelineScrubber({ boardId, onScrubRelease }: TimelineSc
       }
     });
 
-    if (closestFrame && minDiff < 30000) { // Hover thumbnail within 30s proximity
+    if (closestFrame) {
       setHoverThumb((closestFrame as any).thumbnailUrl);
     } else {
       setHoverThumb(null);
@@ -272,23 +313,23 @@ export default function TimelineScrubber({ boardId, onScrubRelease }: TimelineSc
         onMouseLeave={() => setHoverTime(null)}
         className={`h-20 rounded-2xl border relative cursor-ew-resize overflow-hidden ${isDark ? 'bg-zinc-950 border-zinc-800' : 'bg-zinc-100 border-zinc-200'}`}
       >
-        {/* filmstrip backgrounds (thumbnails at times) */}
-        <div className="absolute inset-0 flex items-center pointer-events-none opacity-40 gap-1 overflow-x-auto scrollbar-hide px-2">
-          {timelineFrames.map((frame, i) => {
-            const framePct = ((frame.timestamp - boardStartTime) / totalDuration) * 100;
-            return (
-              <img
-                key={frame._id || i}
-                src={getFullUrl(frame.thumbnailUrl)}
-                alt="thumbnail"
-                style={{ 
-                  left: `${framePct}%`,
-                  transform: 'translateX(-50%)',
-                }}
-                className={`absolute h-16 w-28 object-cover rounded-md border ${isDark ? 'border-zinc-800' : 'border-zinc-300'}`}
-              />
-            );
-          })}
+        {/* filmstrip backgrounds (thumbnails at equal intervals styled like video frames) */}
+        <div className="absolute inset-0 flex pointer-events-none opacity-40 overflow-hidden">
+          {generateFilmstripSlots().map((slot, i) => (
+            <div 
+              key={i} 
+              style={{ width: `${100 / Math.max(1, generateFilmstripSlots().length)}%` }} 
+              className={`h-full border-r last:border-r-0 relative flex-shrink-0 ${isDark ? 'border-zinc-900/40 bg-zinc-950/20' : 'border-zinc-200/40 bg-zinc-50/20'}`}
+            >
+              {slot.frame ? (
+                <img
+                  src={getFullUrl(slot.frame.thumbnailUrl)}
+                  alt="thumbnail"
+                  className="w-full h-full object-cover"
+                />
+              ) : null}
+            </div>
+          ))}
         </div>
 
         {/* Playhead bar */}

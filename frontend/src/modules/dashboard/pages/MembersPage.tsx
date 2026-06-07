@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import DashboardLayout from '../../../layouts/DashboardLayout';
 
 import { api } from '../../../lib/axios';
+import { BACKEND_URL } from '@/config';
 
 import {
   Plus,
@@ -218,7 +219,7 @@ export default function MembersPage() {
 
         {/* HEADER */}
 
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 mb-8">
 
           <div>
             <h1 className="text-4xl font-bold">
@@ -244,7 +245,7 @@ export default function MembersPage() {
 
         {/* STATS */}
 
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 
           <StatCard
             title="Total Members"
@@ -327,7 +328,7 @@ export default function MembersPage() {
 
         ) : (
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             {filteredMembers.map(
               (member) => (
@@ -412,7 +413,7 @@ export default function MembersPage() {
                           >
                             <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-semibold overflow-hidden shrink-0">
                               {u.avatar ? (
-                                <img src={u.avatar.startsWith('/uploads') ? `http://localhost:5000${u.avatar}` : u.avatar} alt="avatar" className="w-full h-full object-cover" />
+                                <img src={u.avatar.startsWith('/uploads') ? `${BACKEND_URL}${u.avatar}` : u.avatar} alt="avatar" className="w-full h-full object-cover" />
                               ) : (
                                 u.name?.charAt(0) || 'U'
                               )}
@@ -452,7 +453,7 @@ export default function MembersPage() {
                       {/* Avatar */}
                       <div className="w-20 h-20 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-2xl shadow-inner overflow-hidden mb-4">
                         {selectedUser.avatar ? (
-                          <img src={selectedUser.avatar.startsWith('/uploads') ? `http://localhost:5000${selectedUser.avatar}` : selectedUser.avatar} alt="avatar" className="w-full h-full object-cover" />
+                          <img src={selectedUser.avatar.startsWith('/uploads') ? `${BACKEND_URL}${selectedUser.avatar}` : selectedUser.avatar} alt="avatar" className="w-full h-full object-cover" />
                         ) : (
                           selectedUser.name?.charAt(0) || 'U'
                         )}

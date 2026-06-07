@@ -194,14 +194,18 @@ export default function CalendarPage() {
   return (
     <DashboardLayout>
 
-      <div className="flex h-full">
+      <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
 
         {/* ================= LEFT PANEL ================= */}
 
         <div
           className="
-            w-[340px]
-            border-r
+            w-full
+            lg:w-[340px]
+            shrink-0
+            border-b
+            lg:border-b-0
+            lg:border-r
             bg-card
             p-5
             overflow-y-auto
@@ -472,7 +476,8 @@ export default function CalendarPage() {
                     )
                   }
                   className={`
-                    h-[88px]
+                    h-[70px]
+                    sm:h-[88px]
                     rounded-2xl
                     border
                     p-2

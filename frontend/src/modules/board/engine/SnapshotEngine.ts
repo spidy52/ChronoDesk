@@ -5,6 +5,7 @@ import { useBoardStore } from '../../../store/useBoardStore';
 class SnapshotEngineClass {
   private snapshotInterval: any = null;
   private lastSnapshotTime = 0;
+  private lastFullSnapshotTime = 0;
   private eventCountSinceLastSnapshot = 0;
 
   /**
@@ -13,23 +14,37 @@ class SnapshotEngineClass {
   public startAutoSnapshots(boardId: string, stageRef: any) {
     this.stopAutoSnapshots();
     this.lastSnapshotTime = Date.now();
+    this.lastFullSnapshotTime = Date.now();
     this.eventCountSinceLastSnapshot = 0;
 
-    // Trigger snapshot evaluation every 30 seconds
+    // Trigger check every 10 seconds to save thumbnail preview frames
     this.snapshotInterval = setInterval(async () => {
       const { isReplayMode, elements } = useBoardStore.getState();
       if (isReplayMode || elements.length === 0) return;
 
-      const timePassed = Date.now() - this.lastSnapshotTime >= 30000;
-      const enoughEvents = this.eventCountSinceLastSnapshot >= 100;
+      const now = Date.now();
+      const timePassed = now - this.lastSnapshotTime >= 10000; // 10 seconds
+      const hasChanges = this.eventCountSinceLastSnapshot > 0; // only save if there are changes
 
-      if (timePassed || enoughEvents) {
-        await this.takeSnapshot(boardId, elements);
+      if (timePassed && hasChanges) {
+        // 1. Capture the 10-second thumbnail picture frame
         if (stageRef.current) {
           await this.captureTimelineFrame(boardId, stageRef.current);
         }
+        this.lastSnapshotTime = now;
+
+        // 2. Separately, save full JSON state snapshot less frequently
+        // (every 5 minutes or if we've accumulated 100 events)
+        const timeForFullSnapshot = now - this.lastFullSnapshotTime >= 300000;
+        const eventsForFullSnapshot = this.eventCountSinceLastSnapshot >= 100;
+
+        if (timeForFullSnapshot || eventsForFullSnapshot) {
+          await this.takeSnapshot(boardId, elements);
+          this.lastFullSnapshotTime = now;
+          this.eventCountSinceLastSnapshot = 0;
+        }
       }
-    }, 30000);
+    }, 10000);
   }
 
   /**
@@ -61,8 +76,6 @@ class SnapshotEngineClass {
       });
 
       if (data.success) {
-        this.lastSnapshotTime = timestamp;
-        this.eventCountSinceLastSnapshot = 0;
         console.log('Whiteboard state snapshot created successfully.');
         return data.snapshot;
       }

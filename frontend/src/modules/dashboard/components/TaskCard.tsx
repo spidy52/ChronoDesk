@@ -5,6 +5,8 @@ import {
   Pencil,
   Flag,
   Plus,
+  ExternalLink,
+  GripVertical,
 } from 'lucide-react';
 
 import {
@@ -255,7 +257,7 @@ export default function TaskCard({
     navigate(`/board/${task._id}`);
   };
 
-  const content = (
+  const renderContent = (dragHandleProps: any) => (
     <div
       onClick={handleCardClick}
       className={`
@@ -279,8 +281,10 @@ export default function TaskCard({
           view === 'list'
             ? `
               flex
-              items-center
-              justify-between
+              flex-col
+              sm:flex-row
+              sm:items-center
+              sm:justify-between
               gap-5
             `
             : ''
@@ -295,6 +299,15 @@ export default function TaskCard({
         {/* TOP */}
 
         <div className="flex items-start justify-between gap-3 mb-4">
+          {view === 'kanban' && dragHandleProps && (
+            <div
+              {...dragHandleProps}
+              className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-all shrink-0 p-1 rounded-md hover:bg-secondary/80 flex items-center justify-center"
+              title="Drag Task"
+            >
+              <GripVertical size={16} />
+            </div>
+          )}
 
           {/* TITLE */}
 
@@ -324,13 +337,23 @@ export default function TaskCard({
               />
 
             ) : (
-
-              <h3
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/board/${task._id}`);
+                }}
                 className={`
+                  text-left
                   font-bold
                   text-foreground
                   leading-tight
                   break-words
+                  hover:text-primary
+                  hover:underline
+                  transition-all
+                  block
+                  w-full
+                  cursor-pointer
 
                   ${
                     view ===
@@ -341,7 +364,7 @@ export default function TaskCard({
                 `}
               >
                 {task.title}
-              </h3>
+              </button>
             )}
           </div>
 
@@ -376,29 +399,53 @@ export default function TaskCard({
 
             ) : (
 
-              <button
-                onClick={() =>
-                  setEditing(
-                    true
-                  )
-                }
-                className="
-                  w-8
-                  h-8
-                  rounded-full
-                  hover:bg-primary/10
-                  flex
-                  items-center
-                  justify-center
-                  text-muted-foreground
-                  hover:text-primary
-                  transition-all
-                "
-              >
-                <Pencil
-                  size={16}
-                />
-              </button>
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/board/${task._id}`);
+                  }}
+                  className="
+                    w-8
+                    h-8
+                    rounded-full
+                    hover:bg-primary/10
+                    flex
+                    items-center
+                    justify-center
+                    text-muted-foreground
+                    hover:text-primary
+                    transition-all
+                  "
+                  title="Open Whiteboard"
+                >
+                  <ExternalLink size={16} />
+                </button>
+                <button
+                  onClick={() =>
+                    setEditing(
+                      true
+                    )
+                  }
+                  className="
+                    w-8
+                    h-8
+                    rounded-full
+                    hover:bg-primary/10
+                    flex
+                    items-center
+                    justify-center
+                    text-muted-foreground
+                    hover:text-primary
+                    transition-all
+                  "
+                  title="Edit Task"
+                >
+                  <Pencil
+                    size={16}
+                  />
+                </button>
+              </>
             )}
 
             <button
@@ -630,7 +677,7 @@ export default function TaskCard({
   /* ================= LIST / GRID ================= */
 
   if (view !== 'kanban') {
-    return content;
+    return renderContent(null);
   }
 
   /* ================= KANBAN ================= */
@@ -649,8 +696,6 @@ export default function TaskCard({
 
           {...provided.draggableProps}
 
-          {...provided.dragHandleProps}
-
           style={{
             ...provided
               .draggableProps
@@ -667,7 +712,7 @@ export default function TaskCard({
               : ''
           }
         >
-          {content}
+          {renderContent(provided.dragHandleProps)}
         </div>
       )}
     </Draggable>

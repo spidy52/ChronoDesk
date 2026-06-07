@@ -39,7 +39,7 @@ export default function WorkspaceDock() {
   };
 
   return (
-    <div className="w-20 h-full bg-zinc-950 border-r border-zinc-900 flex flex-col items-center py-6 shrink-0 z-30">
+    <div className="hidden md:flex w-20 h-full bg-zinc-950 border-r border-zinc-900 flex-col items-center py-6 shrink-0 z-30">
 
       {/* Workspace Icons */}
       <div className="flex flex-col items-center gap-4 flex-1 w-full">

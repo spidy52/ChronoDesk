@@ -4,7 +4,7 @@ import { Stage, Layer, Line, Rect, Circle, Text as KonvaText, Path, Group, Image
 import { 
   Type, Square, Circle as CircleIcon, Triangle, StickyNote, 
   Trash2, MousePointer, Edit2, Eraser, ZoomIn, ZoomOut, Maximize2, Share2, 
-  Download, ArrowLeft, Undo, Redo, Minus, ArrowUpRight, Clock
+  Download, ArrowLeft, Undo, Redo, Minus, ArrowUpRight, Clock, MoreVertical, Hand
 } from 'lucide-react';
 
 import { useBoardStore } from '../../../store/useBoardStore';
@@ -18,6 +18,7 @@ import { SnapshotEngine } from '../engine/SnapshotEngine';
 import type { BoardElement, BoardTool, ImageElement } from '../../../types/board';
 import TimelineScrubber from './TimelineScrubber';
 import api from '../../../lib/axios';
+import { BACKEND_URL } from '@/config';
 
 export default function WhiteboardPage() {
   const { taskId } = useParams<{ taskId: string }>();
@@ -95,7 +96,32 @@ export default function WhiteboardPage() {
   
   // Dimensions
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight - 200 });
-  const [showTimeline, setShowTimeline] = useState(true);
+  const [showTimeline, setShowTimeline] = useState(() => window.innerWidth >= 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [lastTouchDist, setLastTouchDist] = useState<number | null>(null);
+  const [lastTouchCenter, setLastTouchCenter] = useState<{ x: number; y: number } | null>(null);
+
+  // Synchronize undo/redo buttons state reactively with Yjs history stack
+  useEffect(() => {
+    const updateUndoRedoState = () => {
+      setCanUndo(RealtimeEngine.undoManager.canUndo());
+      setCanRedo(RealtimeEngine.undoManager.canRedo());
+    };
+
+    updateUndoRedoState();
+
+    RealtimeEngine.undoManager.on('stack-item-added', updateUndoRedoState);
+    RealtimeEngine.undoManager.on('stack-item-popped', updateUndoRedoState);
+    RealtimeEngine.undoManager.on('stack-item-updated', updateUndoRedoState);
+
+    return () => {
+      RealtimeEngine.undoManager.off('stack-item-added', updateUndoRedoState);
+      RealtimeEngine.undoManager.off('stack-item-popped', updateUndoRedoState);
+      RealtimeEngine.undoManager.off('stack-item-updated', updateUndoRedoState);
+    };
+  }, []);
 
   // Drawing interactions state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -129,6 +155,9 @@ export default function WhiteboardPage() {
     }
     if (activeTool === 'select') {
       return 'default';
+    }
+    if (activeTool === 'pan') {
+      return panning ? 'grabbing' : 'grab';
     }
     if (activeTool === 'pencil' || activeTool === 'marker') {
       return 'crosshair';
@@ -222,7 +251,7 @@ export default function WhiteboardPage() {
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, [showTimeline]);
+  }, [showTimeline, activeTool, selectedIds.length]);
 
   // Clipboard Image Paste Support
   useEffect(() => {
@@ -253,7 +282,7 @@ export default function WhiteboardPage() {
               if (response.data.success && response.data.url) {
                 const imageUrl = response.data.url;
                 const img = new Image();
-                const resolvedUrl = imageUrl.startsWith('http') ? imageUrl : `http://localhost:5000${imageUrl}`;
+                const resolvedUrl = imageUrl.startsWith('http') ? imageUrl : `${BACKEND_URL}${imageUrl}`;
                 img.src = resolvedUrl;
                 img.crossOrigin = 'anonymous';
                 img.onload = () => {
@@ -318,6 +347,79 @@ export default function WhiteboardPage() {
     });
   };
 
+  // Handle multitouch panning & zooming
+  const handleTouchStart = (e: any) => {
+    if (isReplayMode) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const touches = e.evt.touches;
+    if (touches.length === 2) {
+      const p1 = { x: touches[0].clientX, y: touches[0].clientY };
+      const p2 = { x: touches[1].clientX, y: touches[1].clientY };
+      
+      const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      setLastTouchDist(dist);
+
+      const center = {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      };
+      setLastTouchCenter(center);
+      
+      setIsDrawing(false);
+      setActivePoints([]);
+      RealtimeEngine.sendDrawProgress('', '', 0, []);
+    }
+  };
+
+  const handleTouchMove = (e: any) => {
+    if (isReplayMode) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const touches = e.evt.touches;
+    if (touches.length === 2 && lastTouchDist !== null && lastTouchCenter !== null) {
+      e.evt.preventDefault(); // prevent browser pinch zoom
+
+      const p1 = { x: touches[0].clientX, y: touches[0].clientY };
+      const p2 = { x: touches[1].clientX, y: touches[1].clientY };
+      
+      const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      const center = {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      };
+
+      const zoomFactor = dist / lastTouchDist;
+      let newZoom = camera.zoom * zoomFactor;
+      newZoom = RenderingEngine.clampZoom(newZoom);
+
+      const dx = center.x - lastTouchCenter.x;
+      const dy = center.y - lastTouchCenter.y;
+
+      const pointer = stage.getPointerPosition() || center;
+      const mousePointTo = {
+        x: (pointer.x - camera.x) / camera.zoom,
+        y: (pointer.y - camera.y) / camera.zoom,
+      };
+
+      setCamera({
+        zoom: newZoom,
+        x: pointer.x - mousePointTo.x * newZoom + dx,
+        y: pointer.y - mousePointTo.y * newZoom + dy,
+      });
+
+      setLastTouchDist(dist);
+      setLastTouchCenter(center);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setLastTouchDist(null);
+    setLastTouchCenter(null);
+  };
+
   /* ================= DRAG & STAGE INTERACTION ================= */
 
   const handleStageDblClick = (e: any) => {
@@ -364,8 +466,8 @@ export default function WhiteboardPage() {
     const stage = stageRef.current;
     if (!stage) return;
     
-    // Space key panning or middle-mouse click triggers panning
-    const isPanningMode = e.evt.button === 1 || e.evt.button === 2 || activeTool === 'select' && e.evt.spaceKey;
+    // Space key panning, middle/right-mouse click, or Pan tool active
+    const isPanningMode = e.evt.button === 1 || e.evt.button === 2 || activeTool === 'pan' || (activeTool === 'select' && e.evt.spaceKey);
     if (isPanningMode) {
       setPanning(true);
       const pointer = stage.getPointerPosition();
@@ -914,36 +1016,37 @@ export default function WhiteboardPage() {
     <div className={`flex flex-col h-screen w-full ${isDark ? 'bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'} overflow-hidden font-sans relative`}>
       
       {/* 1. TOP DOCK BAR */}
-      <header className={`h-16 border-b ${isDark ? 'border-zinc-900 bg-zinc-950/80' : 'border-zinc-200 bg-white/80'} px-6 flex items-center justify-between backdrop-blur-md z-30 select-none`}>
-        <div className="flex items-center gap-4">
+      <header className={`h-16 border-b ${isDark ? 'border-zinc-900 bg-zinc-950/80' : 'border-zinc-200 bg-white/80'} px-4 md:px-6 flex items-center justify-between backdrop-blur-md z-30 select-none`}>
+        <div className="flex items-center gap-2 md:gap-4">
           <button 
             onClick={() => navigate('/dashboard')}
-            className={`w-10 h-10 rounded-xl ${isDark ? 'hover:bg-zinc-900 text-zinc-400 hover:text-white' : 'hover:bg-zinc-100 text-zinc-500 hover:text-black'} flex items-center justify-center transition-all`}
+            className={`w-9 h-9 md:w-10 md:h-10 rounded-xl ${isDark ? 'hover:bg-zinc-900 text-zinc-400 hover:text-white' : 'hover:bg-zinc-100 text-zinc-500 hover:text-black'} flex items-center justify-center transition-all`}
           >
             <ArrowLeft size={18} />
           </button>
           
           <div>
-            <h1 className={`font-bold text-base leading-tight tracking-wide ${isDark ? 'text-zinc-100' : 'text-zinc-900'} flex items-center gap-2`}>
+            <h1 className={`font-bold text-sm md:text-base leading-tight tracking-wide ${isDark ? 'text-zinc-100' : 'text-zinc-900'} flex items-center gap-1.5 md:gap-2 max-w-[100px] sm:max-w-xs md:max-w-none truncate`}>
               {board?.title || 'Whiteboard Loading...'}
               {isReplayMode && (
-                <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
                   REPLAY REVIEW
                 </span>
               )}
             </h1>
-            <p className="text-[10px] text-zinc-500 font-mono mt-0.5">
+            <p className="text-[9px] md:text-[10px] text-zinc-500 font-mono mt-0.5 truncate max-w-[100px] sm:max-w-xs md:max-w-none">
               Task Workspace Dedicated Room
             </p>
           </div>
         </div>
 
-        {/* Collaborators online avatars */}
-        <div className="flex items-center gap-6">
+        {/* Collaborators online avatars and actions */}
+        <div className="flex items-center gap-2 md:gap-6">
+          {/* Collaborator Avatars */}
           <div className="flex items-center -space-x-1.5">
             {selfProfile && (
               <div 
-                className={`w-8 h-8 rounded-full border-2 ${isDark ? 'border-zinc-950' : 'border-white'} flex items-center justify-center text-xs font-bold text-white shadow-lg bg-blue-600`}
+                className={`w-7 h-7 md:w-8 md:h-8 rounded-full border-2 ${isDark ? 'border-zinc-950' : 'border-white'} flex items-center justify-center text-[10px] md:text-xs font-bold text-white shadow-lg bg-blue-600`}
                 title={`${selfProfile.name} (You)`}
               >
                 {selfProfile.name.charAt(0)}
@@ -954,7 +1057,7 @@ export default function WhiteboardPage() {
               <div 
                 key={c.userId}
                 style={{ backgroundColor: c.color }}
-                className={`w-8 h-8 rounded-full border-2 ${isDark ? 'border-zinc-950' : 'border-white'} flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-black/20`}
+                className={`w-7 h-7 md:w-8 md:h-8 rounded-full border-2 ${isDark ? 'border-zinc-950' : 'border-white'} flex items-center justify-center text-[10px] md:text-xs font-bold text-white shadow-lg shadow-black/20`}
                 title={c.name}
               >
                 {c.name.charAt(0)}
@@ -962,52 +1065,54 @@ export default function WhiteboardPage() {
             ))}
           </div>
 
-          <div className={`h-6 w-px ${isDark ? 'bg-zinc-900' : 'bg-zinc-200'}`}></div>
+          <div className={`hidden sm:block h-6 w-px ${isDark ? 'bg-zinc-900' : 'bg-zinc-200'}`}></div>
 
           {/* Sync Status Badge */}
-          <div className={`flex items-center gap-1.5 text-xs ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
+          <div className="flex items-center gap-1.5 text-xs">
             {syncStatus === 'connected' ? (
               <span className={`flex items-center gap-1.5 font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-emerald-950"></span>
-                Connected
+                <span className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-emerald-500 border-2 border-emerald-950"></span>
+                <span className="hidden md:inline">Connected</span>
               </span>
             ) : syncStatus === 'connecting' ? (
               <span className={`flex items-center gap-1.5 font-semibold ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-amber-950 animate-pulse"></span>
-                Connecting
+                <span className="hidden md:inline">Connecting</span>
               </span>
             ) : (
               <span className={`flex items-center gap-1.5 font-semibold ${isDark ? 'text-zinc-500' : 'text-zinc-400'}`}>
                 <span className="w-2.5 h-2.5 rounded-full bg-zinc-600 border-2 border-zinc-950"></span>
-                Offline
+                <span className="hidden md:inline">Offline</span>
               </span>
             )}
           </div>
 
           <div className={`h-6 w-px ${isDark ? 'bg-zinc-900' : 'bg-zinc-200'}`}></div>
 
-          {/* Sinks Undo / Redo */}
-          <div className={`flex items-center ${isDark ? 'bg-zinc-900/60 border-zinc-800/40' : 'bg-zinc-100 border-zinc-200'} p-1 rounded-xl border`}>
+          {/* Undo / Redo */}
+          <div className={`flex items-center ${isDark ? 'bg-zinc-900/60 border-zinc-800/40' : 'bg-zinc-100 border-zinc-200'} p-0.5 md:p-1 rounded-lg md:rounded-xl border`}>
             <button
               onClick={() => RealtimeEngine.undo()}
-              disabled={isReplayMode}
-              className={`p-1.5 ${isDark ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-600 hover:text-black'} rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all`}
+              disabled={isReplayMode || !canUndo}
+              className={`p-1 md:p-1.5 ${isDark ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-600 hover:text-black'} rounded-md md:rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all`}
               title="Undo (Ctrl+Z)"
             >
               <Undo size={14} />
             </button>
             <button
               onClick={() => RealtimeEngine.redo()}
-              disabled={isReplayMode}
-              className={`p-1.5 ${isDark ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-600 hover:text-black'} rounded-lg disabled:opacity-30 disabled:pointer-events-none transition-all`}
+              disabled={isReplayMode || !canRedo}
+              className={`p-1 md:p-1.5 ${isDark ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white' : 'hover:bg-zinc-200 text-zinc-600 hover:text-black'} rounded-md md:rounded-lg disabled:opacity-20 disabled:cursor-not-allowed transition-all`}
               title="Redo (Ctrl+Y)"
             >
               <Redo size={14} />
             </button>
           </div>
 
-          {/* Exports drop downs */}
-          <div className="flex items-center gap-2">
+          <div className={`hidden md:block h-6 w-px ${isDark ? 'bg-zinc-900' : 'bg-zinc-200'}`}></div>
+
+          {/* Exports drop downs (Desktop) */}
+          <div className="hidden md:flex items-center gap-2">
             <button
               onClick={() => setShowTimeline(!showTimeline)}
               className={`px-3 py-1.5 text-xs rounded-xl border ${showTimeline ? (isDark ? 'bg-blue-600/20 border-blue-500/30 text-blue-400' : 'bg-blue-50 border-blue-200 text-blue-600') : (isDark ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white' : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700 hover:text-black')} font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95`}
@@ -1033,15 +1138,161 @@ export default function WhiteboardPage() {
               SVG
             </button>
           </div>
+
+          {/* More actions menu (Mobile) */}
+          <div className="relative md:hidden">
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className={`p-1.5 rounded-lg border ${isDark ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300' : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700'} transition-all`}
+            >
+              <MoreVertical size={16} />
+            </button>
+            {showMobileMenu && (
+              <div className={`absolute right-0 top-full mt-1.5 flex flex-col gap-1 p-2 rounded-xl border shadow-xl z-50 ${isDark ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-zinc-200'} text-xs font-semibold w-40`}>
+                <button
+                  onClick={() => {
+                    setShowTimeline(!showTimeline);
+                    setShowMobileMenu(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 ${isDark ? 'hover:bg-zinc-900 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'}`}
+                >
+                  <Clock size={13} />
+                  {showTimeline ? "Hide Timeline" : "Show Timeline"}
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportPNG();
+                    setShowMobileMenu(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 ${isDark ? 'hover:bg-zinc-900 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'}`}
+                >
+                  <Download size={13} />
+                  Export PNG
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportSVG();
+                    setShowMobileMenu(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 ${isDark ? 'hover:bg-zinc-900 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'}`}
+                >
+                  <Share2 size={13} />
+                  Export SVG
+                </button>
+                <div className={`h-px ${isDark ? 'bg-zinc-900' : 'bg-zinc-200'} my-1`}></div>
+                <div className="px-3 py-1 flex items-center gap-1.5 text-[9px] text-zinc-500 font-mono">
+                  <span className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500' : syncStatus === 'connecting' ? 'bg-amber-500 animate-pulse' : 'bg-zinc-500'}`}></span>
+                  {syncStatus.toUpperCase()}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
+
+      {/* Mobile Toolbar Block (Samsung Notes Style - Stays static under the header, pushing the canvas down) */}
+      <div className={`md:hidden flex flex-col border-b ${isDark ? 'border-zinc-900 bg-zinc-950 text-zinc-300' : 'border-zinc-200 bg-white text-zinc-800'} z-20 select-none`}>
+        {/* Main Toolbar */}
+        <div className={`flex items-center gap-1 p-1 overflow-x-auto scrollbar-none justify-between border-b ${isDark ? 'border-zinc-900' : 'border-zinc-100'}`}>
+          <ToolButton tool="select" icon={<MousePointer size={16} />} title="Select" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="pan" icon={<Hand size={16} />} title="Pan" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="pencil" icon={<Edit2 size={16} />} title="Pencil" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="eraser" icon={<Eraser size={16} />} title="Eraser" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="text" icon={<Type size={16} />} title="Text" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          
+          <div className={`h-6 w-px ${isDark ? 'bg-zinc-900' : 'bg-zinc-200'} mx-0.5`}></div>
+          
+          <ToolButton tool="rect" icon={<Square size={16} />} title="Rect" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="circle" icon={<CircleIcon size={16} />} title="Circle" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="triangle" icon={<Triangle size={16} />} title="Triangle" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="line" icon={<Minus size={16} />} title="Line" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="arrow" icon={<ArrowUpRight size={16} />} title="Arrow" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="sticky" icon={<StickyNote size={16} />} title="Sticky" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+        </div>
+
+        {/* Mobile Properties Strip (Only visible when activeTool is editing/drawing and not eraser) */}
+        {activeTool !== 'eraser' && (
+          <div className="flex flex-col gap-2 p-2.5 text-xs">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                {activeTool === 'sticky' ? 'Note Background' : 'Color'}
+              </span>
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                <ColorDot color="#3b82f6" active={strokeColor} onClick={setStrokeColor} /> {/* blue */}
+                <ColorDot color="#ef4444" active={strokeColor} onClick={setStrokeColor} /> {/* red */}
+                <ColorDot color="#10b981" active={strokeColor} onClick={setStrokeColor} /> {/* emerald */}
+                <ColorDot color="#f59e0b" active={strokeColor} onClick={setStrokeColor} /> {/* amber */}
+                <ColorDot color="#a855f7" active={strokeColor} onClick={setStrokeColor} /> {/* purple */}
+                <ColorDot color="#e2e8f0" active={strokeColor} onClick={setStrokeColor} /> {/* slate/light */}
+                {activeTool === 'sticky' && <ColorDot color="#fef08a" active={strokeColor} onClick={setStrokeColor} />} {/* sticky yellow */}
+              </div>
+            </div>
+            
+            {activeTool !== 'sticky' && activeTool !== 'text' && (
+              <div className={`flex items-center justify-between gap-3 border-t ${isDark ? 'border-zinc-900' : 'border-zinc-100'} pt-2`}>
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider shrink-0">Width</span>
+                <div className="flex-1 flex items-center gap-2">
+                  <input 
+                    type="range" 
+                    min="2" 
+                    max="30" 
+                    value={brushWidth} 
+                    onChange={(e) => setBrushWidth(Number(e.target.value))}
+                    className={`w-full h-1 rounded-lg appearance-none cursor-pointer accent-blue-500 ${isDark ? 'bg-zinc-800' : 'bg-zinc-200'}`} 
+                  />
+                  <span className={`text-[10px] font-mono shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>{brushWidth}px</span>
+                </div>
+              </div>
+            )}
+
+            {selectedElement && (selectedElement.tool === 'text' || selectedElement.tool === 'sticky') && (
+              <div className={`flex flex-col gap-1 border-t ${isDark ? 'border-zinc-900' : 'border-zinc-100'} pt-2`}>
+                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                  Edit Text
+                </span>
+                <textarea
+                  value={(selectedElement as any).text || ''}
+                  onChange={(e) => {
+                    const updated = {
+                      ...selectedElement,
+                      text: e.target.value,
+                    } as BoardElement;
+                    RealtimeEngine.updateElementLocally(updated);
+                  }}
+                  onBlur={() => {
+                    RealtimeEngine.commitElement('UPDATE_ELEMENT', selectedElement);
+                    SnapshotEngine.logEvent();
+                  }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  className={`${isDark ? 'bg-zinc-950 border-zinc-800 text-white' : 'bg-white border-zinc-200 text-zinc-900'} border rounded-lg p-2 text-xs outline-none focus:border-blue-500 w-full h-12 resize-none font-sans`}
+                  placeholder="Type text..."
+                />
+              </div>
+            )}
+
+            {selectedIds.length > 0 && (
+              <div className={`flex items-center gap-2 border-t ${isDark ? 'border-zinc-900' : 'border-zinc-100'} pt-2`}>
+                <button
+                  onClick={handleDeleteSelected}
+                  className="w-full py-1 bg-red-950/20 hover:bg-red-950/40 border border-red-500/20 text-red-400 hover:text-red-300 rounded-lg font-semibold text-[10px] transition-all flex items-center justify-center gap-1"
+                  title="Delete element"
+                >
+                  <Trash2 size={12} />
+                  Delete Element
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* 2. MAIN CORE LAYOUT AREA */}
       <div className="flex-1 flex relative overflow-hidden">
         
-        {/* Left Floating Tools Toolbar */}
-        <div className={`absolute left-6 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 ${isDark ? 'bg-zinc-950/80 border-zinc-800/80 text-zinc-300' : 'bg-white/95 border-zinc-200 text-zinc-800'} backdrop-blur-md border p-2.5 rounded-2xl shadow-2xl z-30 select-none`}>
+        {/* Left Floating Tools Toolbar (Desktop only) */}
+        <div className={`hidden md:flex absolute left-6 top-1/2 -translate-y-1/2 flex-col items-center gap-2 ${isDark ? 'bg-zinc-950/80 border-zinc-800/80 text-zinc-300' : 'bg-white/95 border-zinc-200 text-zinc-800'} backdrop-blur-md border p-2.5 rounded-2xl shadow-2xl z-30 select-none`}>
           <ToolButton tool="select" icon={<MousePointer size={18} />} title="Selection (V)" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
+          <ToolButton tool="pan" icon={<Hand size={18} />} title="Grab / Pan (H)" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
           <ToolButton tool="pencil" icon={<Edit2 size={18} />} title="Pencil (P)" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
           <ToolButton tool="eraser" icon={<Eraser size={18} />} title="Eraser (E)" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
           <ToolButton tool="text" icon={<Type size={18} />} title="Text (T)" active={activeTool} onClick={setActiveTool} disabled={isReplayMode} />
@@ -1078,6 +1329,16 @@ export default function WhiteboardPage() {
             } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
               e.preventDefault();
               RealtimeEngine.redo();
+            } else if (e.key.toLowerCase() === 'h') {
+              setActiveTool('pan');
+            } else if (e.key.toLowerCase() === 'v') {
+              setActiveTool('select');
+            } else if (e.key.toLowerCase() === 'p') {
+              setActiveTool('pencil');
+            } else if (e.key.toLowerCase() === 'e') {
+              setActiveTool('eraser');
+            } else if (e.key.toLowerCase() === 't') {
+              setActiveTool('text');
             }
           }}
         >
@@ -1091,6 +1352,9 @@ export default function WhiteboardPage() {
             onMouseMove={handleStageMouseMove}
             onMouseUp={handleStageMouseUp}
             onDblClick={handleStageDblClick}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
             className={`absolute inset-0 transition-colors duration-300 ${isDark ? 'bg-[#09090b]' : 'bg-zinc-50'}`}
           >
             {/* Grid Line background layer */}
@@ -1488,9 +1752,9 @@ export default function WhiteboardPage() {
             </Layer>
           </Stage>
 
-          {/* Floating Right Controls Properties Inspector */}
+          {/* Floating Right Controls Properties Inspector (Desktop only) */}
           {activeTool !== 'eraser' && (
-            <div className={`absolute right-6 top-6 flex flex-col gap-4 ${isDark ? 'bg-zinc-950/80 border-zinc-800/80 text-zinc-300' : 'bg-white/95 border-zinc-200 text-zinc-800'} backdrop-blur-md border p-4 rounded-2xl shadow-2xl z-30 select-none w-56 text-sm`}>
+            <div className={`hidden md:flex absolute right-6 top-6 flex-col gap-4 ${isDark ? 'bg-zinc-950/80 border-zinc-800/80 text-zinc-300' : 'bg-white/95 border-zinc-200 text-zinc-800'} backdrop-blur-md border p-4 rounded-2xl shadow-2xl z-30 select-none w-56 text-sm`}>
               <div className="flex flex-col gap-2">
                 <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
                   {activeTool === 'sticky' ? 'Note Background' : 'Stroke Color'}
@@ -1576,7 +1840,7 @@ export default function WhiteboardPage() {
           )}
 
           {/* Canvas Navigation Camera Controls bottom right */}
-          <div className={`absolute right-6 bottom-6 flex items-center gap-1 ${isDark ? 'bg-zinc-950/80 border-zinc-800/80 text-zinc-300' : 'bg-white/95 border-zinc-200 text-zinc-800'} backdrop-blur-md border p-1.5 rounded-xl shadow-xl z-30 select-none`}>
+          <div className={`absolute right-4 bottom-4 md:right-6 md:bottom-6 scale-90 md:scale-100 flex items-center gap-1 ${isDark ? 'bg-zinc-950/80 border-zinc-800/80 text-zinc-300' : 'bg-white/95 border-zinc-200 text-zinc-800'} backdrop-blur-md border p-1.5 rounded-xl shadow-xl z-30 select-none`}>
             <button
               onClick={() => setCamera({ zoom: RenderingEngine.clampZoom(camera.zoom - 0.1) })}
               className={`p-1.5 ${isDark ? 'hover:bg-zinc-800 text-zinc-400 hover:text-white' : 'hover:bg-zinc-100 text-zinc-500 hover:text-black'} rounded-lg transition-all`}
@@ -1658,7 +1922,7 @@ function WhiteboardImage({ el, id, rotation, onTransformEnd }: { el: ImageElemen
 
   useEffect(() => {
     const img = new Image();
-    const resolvedUrl = el.src.startsWith('http') ? el.src : `http://localhost:5000${el.src}`;
+    const resolvedUrl = el.src.startsWith('http') ? el.src : `${BACKEND_URL}${el.src}`;
     img.src = resolvedUrl;
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -1707,7 +1971,7 @@ function ToolButton({
       onClick={() => onClick(tool)}
       disabled={disabled}
       className={`
-        w-10 h-10 rounded-xl flex items-center justify-center transition-all select-none relative group
+        w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center transition-all select-none relative group
         ${isSelected ? 'bg-blue-600 text-white shadow-lg' : (isDark ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900' : 'text-zinc-600 hover:text-black hover:bg-zinc-100')}
         disabled:opacity-30 disabled:pointer-events-none
       `}
@@ -1738,7 +2002,7 @@ function ColorDot({
       onClick={() => onClick(color)}
       style={{ backgroundColor: color }}
       className={`
-        w-8 h-8 rounded-xl transition-all shadow-md active:scale-90 border-2
+        w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl transition-all shadow-md active:scale-90 border-2
         ${isSelected ? 'border-white scale-110 shadow-lg shadow-black/40' : 'border-zinc-800/40 hover:scale-105'}
       `}
     />

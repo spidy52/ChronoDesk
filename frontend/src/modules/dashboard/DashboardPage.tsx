@@ -26,6 +26,7 @@ export default function DashboardPage() {
 
   const [sidebarOpen, setSidebarOpen] =
     useState(() => {
+      if (window.innerWidth < 768) return false;
       const saved =
         localStorage.getItem(
           'sidebarOpen'
@@ -82,6 +83,14 @@ export default function DashboardPage() {
       <Sidebar
         isOpen={sidebarOpen}
       />
+
+      {/* Backdrop for mobile overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-10 md:hidden backdrop-blur-[2px]"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* ================= MAIN CONTENT ================= */}
 
