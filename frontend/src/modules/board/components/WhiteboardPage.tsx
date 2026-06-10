@@ -143,6 +143,13 @@ export default function WhiteboardPage() {
   const [textInput, setTextInput] = useState<{ x: number; y: number; wx: number; wy: number; elementId?: string } | null>(null);
   const [textVal, setTextVal] = useState('');
 
+  const textInputMountTimeRef = useRef<number>(0);
+  useEffect(() => {
+    if (textInput) {
+      textInputMountTimeRef.current = Date.now();
+    }
+  }, [textInput]);
+
   const selectedElement = selectedIds.length > 0
     ? elements.find((e) => e.id === selectedIds[0])
     : null;
@@ -832,8 +839,11 @@ export default function WhiteboardPage() {
   };
 
   // Commit text from input editor overlay
-  const handleTextCommit = () => {
+  const handleTextCommit = (fromBlur?: boolean) => {
     if (!textInput || !board) return;
+    if (fromBlur && Date.now() - textInputMountTimeRef.current < 200) {
+      return;
+    }
     const currentInput = textInput;
     setTextInput(null);
     setActiveTool('select');
@@ -1612,8 +1622,6 @@ export default function WhiteboardPage() {
                       <KonvaText
                         x={0}
                         y={0}
-                        width={el.width}
-                        height={el.height}
                         text={(el as any).text}
                         fontSize={(el as any).fontSize || 24}
                         fill={el.color}
@@ -2023,7 +2031,7 @@ export default function WhiteboardPage() {
                 type="text"
                 value={textVal}
                 onChange={(e) => setTextVal(e.target.value)}
-                onBlur={handleTextCommit}
+                onBlur={() => handleTextCommit(true)}
                 onKeyDown={(e) => {
                   e.stopPropagation();
                   if (e.key === 'Enter') handleTextCommit();
