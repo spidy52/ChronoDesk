@@ -8,7 +8,6 @@ import { BACKEND_URL } from '@/config';
 import {
   Plus,
   Search,
-  MoreVertical,
   Crown,
   Shield,
   User,
