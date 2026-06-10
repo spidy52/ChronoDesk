@@ -65,6 +65,13 @@ const taskSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+
+    pendingCollaborators: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     timestamps: true,

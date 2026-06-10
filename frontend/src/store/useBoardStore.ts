@@ -66,6 +66,7 @@ interface BoardState {
   setPlaybackSpeed: (speed: number) => void;
   setTimelineFrames: (frames: TimelineFrame[]) => void;
   clearBoard: () => void;
+  setError: (error: string | null) => void;
 }
 
 export const useBoardStore = create<BoardState>((set) => ({
@@ -170,4 +171,5 @@ export const useBoardStore = create<BoardState>((set) => ({
   setPlaybackSpeed: (playbackSpeed) => set({ playbackSpeed }),
   setTimelineFrames: (timelineFrames) => set({ timelineFrames }),
   clearBoard: () => set({ elements: [], selectedIds: [] }),
+  setError: (error) => set({ error }),
 }));

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useWorkspaceStore } from '../../../../store/workspaceStore';
+import toast from 'react-hot-toast';
 
 export default function CreateWorkspaceModal({
   onClose,
@@ -19,10 +20,11 @@ export default function CreateWorkspaceModal({
     try {
       setLoading(true);
       await addWorkspace({ name, description });
+      toast.success('Workspace created successfully');
       onClose();
     } catch (error) {
       console.error(error);
-      alert('Failed to create workspace');
+      toast.error('Failed to create workspace');
     } finally {
       setLoading(false);
     }

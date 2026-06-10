@@ -22,6 +22,7 @@ export default function TaskDetailsDrawer({
   const [status, setStatus] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -30,6 +31,7 @@ export default function TaskDetailsDrawer({
       setPriority(task.priority);
       setStatus(task.status);
       setDueDate(task.dueDate || '');
+      setShowDeleteConfirm(false);
     }
   }, [task]);
 
@@ -56,8 +58,6 @@ export default function TaskDetailsDrawer({
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
-
     setLoading(true);
 
     try {
@@ -69,6 +69,7 @@ export default function TaskDetailsDrawer({
       toast.error('Failed to delete task');
     } finally {
       setLoading(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -177,30 +178,57 @@ export default function TaskDetailsDrawer({
 
         {/* Footer */}
         <div className="flex items-center gap-3 p-6 border-t border-border">
-          <button
-            onClick={handleDelete}
-            disabled={loading}
-            className="px-4 py-3 rounded-xl border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <Trash2 size={16} />
-            Delete
-          </button>
-          <div className="flex-1" />
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="px-4 py-3 rounded-xl border border-border hover:bg-secondary transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="px-4 py-3 rounded-xl bg-primary hover:bg-primary/90 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <Check size={16} />
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
+          {showDeleteConfirm ? (
+            <div className="flex items-center justify-between w-full bg-red-500/5 border border-red-500/20 rounded-xl p-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <span className="text-sm font-semibold text-red-500 flex items-center gap-2">
+                <Trash2 size={16} />
+                Delete this task?
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDelete}
+                  disabled={loading}
+                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors"
+                >
+                  Yes, Delete
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={loading}
+                  className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-secondary text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={loading}
+                className="px-4 py-3 rounded-xl border border-red-500/50 text-red-500 hover:bg-red-500/10 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Trash2 size={16} />
+                Delete
+              </button>
+              <div className="flex-1" />
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="px-4 py-3 rounded-xl border border-border hover:bg-secondary transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={loading}
+                className="px-4 py-3 rounded-xl bg-primary hover:bg-primary/90 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Check size={16} />
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

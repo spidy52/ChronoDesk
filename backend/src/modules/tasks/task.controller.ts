@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { io } from '../../index';
 
 import Task from '../../models/Task';
+import Members from '../../models/Member';
 
 import {
   AuthRequest,
@@ -26,6 +27,7 @@ export const createTask =
       // Populate for socket event
       const populatedTask = await Task.findById(task._id)
         .populate('collaborators', 'name email username avatar')
+        .populate('pendingCollaborators', 'name email username avatar')
         .populate('createdBy', 'name email username avatar');
 
       if (req.user?.userId) {
@@ -65,6 +67,7 @@ export const getTasks =
           ]
         })
         .populate('collaborators', 'name email username avatar')
+        .populate('pendingCollaborators', 'name email username avatar')
         .populate('createdBy', 'name email username avatar')
         .sort({
           createdAt: -1,
@@ -113,6 +116,7 @@ export const updateTask =
           }
         )
         .populate('collaborators', 'name email username avatar')
+        .populate('pendingCollaborators', 'name email username avatar')
         .populate('createdBy', 'name email username avatar');
 
       if (updatedTask) {
@@ -184,21 +188,44 @@ export const addCollaborator = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { userId } = req.body; // User to add
+    const creatorId = req.user?.userId;
+
+    if (!creatorId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    // Check connection status
+    const isConnected = await Members.findOne({
+      $or: [
+        { fromUser: creatorId, toUser: userId },
+        { fromUser: userId, toUser: creatorId }
+      ],
+      status: 'accepted'
+    });
+
+    if (!isConnected) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'The user must accept your connection invitation before being added as a collaborator' 
+      });
+    }
 
     const task = await Task.findOneAndUpdate(
-      { _id: id, createdBy: req.user?.userId }, // Only creator can add
-      { $addToSet: { collaborators: userId } },
+      { _id: id, createdBy: creatorId }, // Only creator can add
+      { $addToSet: { pendingCollaborators: userId } },
       { new: true }
-    ).populate('collaborators', 'name email username avatar').populate('createdBy', 'name email username avatar');
+    ).populate('collaborators', 'name email username avatar')
+     .populate('pendingCollaborators', 'name email username avatar')
+     .populate('createdBy', 'name email username avatar');
 
     if (!task) {
       return res.status(404).json({ success: false, error: 'Task not found or unauthorized' });
     }
 
     io.to(task.createdBy._id.toString()).emit('task:updated', task);
-    task.collaborators.forEach((collab: any) => {
-      io.to(collab._id.toString()).emit('task:updated', task);
-    });
+
+    // Emit connection invite to target user
+    io.to(userId).emit('invitation:sent', { type: 'task', taskTitle: task.title });
 
     res.json({ success: true, task });
   } catch (error) {
@@ -215,9 +242,11 @@ export const removeCollaborator = async (req: AuthRequest, res: Response) => {
 
     const task = await Task.findOneAndUpdate(
       { _id: id, createdBy: req.user?.userId },
-      { $pull: { collaborators: userId } },
+      { $pull: { collaborators: userId, pendingCollaborators: userId } },
       { new: true }
-    ).populate('collaborators', 'name email username avatar').populate('createdBy', 'name email username avatar');
+    ).populate('collaborators', 'name email username avatar')
+     .populate('pendingCollaborators', 'name email username avatar')
+     .populate('createdBy', 'name email username avatar');
 
     if (!task) {
       return res.status(404).json({ success: false, error: 'Task not found or unauthorized' });
@@ -234,5 +263,74 @@ export const removeCollaborator = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, error: 'Failed to remove collaborator' });
+  }
+};
+
+/* ================= ACCEPT TASK INVITATION ================= */
+export const acceptTaskInvitation = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const task = await Task.findOneAndUpdate(
+      { _id: id, pendingCollaborators: userId },
+      { 
+        $pull: { pendingCollaborators: userId },
+        $addToSet: { collaborators: userId }
+      },
+      { new: true }
+    ).populate('collaborators', 'name email username avatar')
+     .populate('pendingCollaborators', 'name email username avatar')
+     .populate('createdBy', 'name email username avatar');
+
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Invitation not found or task already accepted' });
+    }
+
+    // Emit socket updates
+    io.to(task.createdBy._id.toString()).emit('task:updated', task);
+    task.collaborators.forEach((collab: any) => {
+      io.to(collab._id.toString()).emit('task:updated', task);
+    });
+
+    res.json({ success: true, message: 'Invitation accepted successfully', task });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, error: 'Failed to accept task invitation' });
+  }
+};
+
+/* ================= REJECT TASK INVITATION ================= */
+export const rejectTaskInvitation = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const task = await Task.findOneAndUpdate(
+      { _id: id, pendingCollaborators: userId },
+      { $pull: { pendingCollaborators: userId } },
+      { new: true }
+    ).populate('collaborators', 'name email username avatar')
+     .populate('pendingCollaborators', 'name email username avatar')
+     .populate('createdBy', 'name email username avatar');
+
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Invitation not found' });
+    }
+
+    io.to(task.createdBy._id.toString()).emit('task:updated', task);
+
+    res.json({ success: true, message: 'Invitation rejected successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, error: 'Failed to reject task invitation' });
   }
 };

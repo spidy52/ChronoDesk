@@ -39,6 +39,7 @@ export default function WhiteboardPage() {
     selfProfile,
     syncStatus,
     isReplayMode,
+    error,
     setBoard,
     setElements,
     setSelectedIds,
@@ -47,6 +48,7 @@ export default function WhiteboardPage() {
     setActiveTool,
     setStrokeColor,
     setBrushWidth,
+    setError,
   } = useBoardStore();
 
   const theme = useUIStore((state) => state.theme);
@@ -210,8 +212,10 @@ export default function WhiteboardPage() {
           // 5. Initialize auto-saving snapshots every 30s
           SnapshotEngine.startAutoSnapshots(data.board._id, stageRef);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to initialize board API:', err);
+        const errMsg = err.response?.data?.error || 'Failed to initialize whiteboard. Make sure you are a collaborator on this task.';
+        setError(errMsg);
       }
     };
 
@@ -222,6 +226,7 @@ export default function WhiteboardPage() {
       SnapshotEngine.stopAutoSnapshots();
       TimelineEngine.stopPlayback();
       TimelineEngine.clearCache();
+      setError(null);
     };
   }, [taskId, tasks]);
 
@@ -1011,6 +1016,33 @@ export default function WhiteboardPage() {
   const visibleElements = elements.filter((el) => 
     RenderingEngine.isElementInViewport(el, camera, dimensions.width, dimensions.height)
   );
+
+  if (error) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-screen w-full p-6 ${isDark ? 'bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'} font-sans`}>
+        <div className={`max-w-md w-full p-8 rounded-3xl border text-center shadow-2xl backdrop-blur-md ${isDark ? 'bg-zinc-900/40 border-zinc-800' : 'bg-white/80 border-zinc-200'}`}>
+          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.249-8.25-3.286zm0 13.036h.008v.008H12v-.008z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold mb-3 tracking-tight">Access Denied</h2>
+          <p className={`text-sm mb-8 leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+            {error}
+          </p>
+          <button
+            onClick={() => {
+              setError(null);
+              navigate('/dashboard');
+            }}
+            className="w-full py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+          >
+            Go Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col h-screen w-full ${isDark ? 'bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'} overflow-hidden font-sans relative`}>

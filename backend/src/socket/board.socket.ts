@@ -1,47 +1,90 @@
 import { Server, Socket } from 'socket.io';
 import BoardEvent from '../models/BoardEvent';
 import User from '../models/User';
+import Board from '../models/Board';
+import Task from '../models/Task';
+import Members from '../models/Member';
 
 export default function setupBoardSocket(io: Server, socket: Socket) {
   
   // User joins a whiteboard room
   socket.on('board:join', async ({ boardId }) => {
     const userId = socket.data.userId;
-    if (!boardId) return;
+    if (!boardId || !userId) return;
 
-    socket.join(boardId);
-    socket.data.boardId = boardId;
-
-    // Fetch user details for presence info
-    const user = await User.findById(userId).select('name email username avatar');
-    const userProfile = {
-      userId,
-      name: user?.name || user?.username || 'Collaborator',
-      avatar: user?.avatar || '',
-      color: getRandomColor(userId), // Generates stable color per user
-    };
-
-    console.log(`User ${userId} (${userProfile.name}) joined board room ${boardId}`);
-
-    // Notify others in room about new collaborator
-    socket.to(boardId).emit('board:user-joined', userProfile);
-
-    // List all users in room to return to the joiner
-    const sockets = await io.in(boardId).fetchSockets();
-    const activeUsers = [];
-    for (const s of sockets) {
-      if (s.data.userId && s.data.userId !== userId) {
-        const u = await User.findById(s.data.userId).select('name email username avatar');
-        activeUsers.push({
-          userId: s.data.userId,
-          name: u?.name || u?.username || 'Collaborator',
-          avatar: u?.avatar || '',
-          color: getRandomColor(s.data.userId),
-        });
+    try {
+      const board = await Board.findById(boardId);
+      if (!board) {
+        socket.emit('board:error', { error: 'Whiteboard not found' });
+        return;
       }
-    }
 
-    socket.emit('board:joined', { activeUsers, selfProfile: userProfile });
+      const task = await Task.findById(board.taskId);
+      if (!task) {
+        socket.emit('board:error', { error: 'Associated task not found' });
+        return;
+      }
+
+      const isCreator = task.createdBy.toString() === userId;
+      if (!isCreator) {
+        const isCollab = task.collaborators.some((id: any) => id.toString() === userId);
+        if (!isCollab) {
+          socket.emit('board:error', { error: 'Access denied: You are not a collaborator on this task' });
+          return;
+        }
+
+        // Verify accepted connection status
+        const isConnected = await Members.findOne({
+          $or: [
+            { fromUser: task.createdBy, toUser: userId },
+            { fromUser: userId, toUser: task.createdBy }
+          ],
+          status: 'accepted'
+        });
+
+        if (!isConnected) {
+          socket.emit('board:error', { error: 'Access denied: Connection invitation is not accepted' });
+          return;
+        }
+      }
+
+      socket.join(boardId);
+      socket.data.boardId = boardId;
+
+      // Fetch user details for presence info
+      const user = await User.findById(userId).select('name email username avatar');
+      const userProfile = {
+        userId,
+        name: user?.name || user?.username || 'Collaborator',
+        avatar: user?.avatar || '',
+        color: getRandomColor(userId), // Generates stable color per user
+      };
+
+      console.log(`User ${userId} (${userProfile.name}) joined board room ${boardId}`);
+
+      // Notify others in room about new collaborator
+      socket.to(boardId).emit('board:user-joined', userProfile);
+
+      // List all users in room to return to the joiner
+      const sockets = await io.in(boardId).fetchSockets();
+      const activeUsers = [];
+      for (const s of sockets) {
+        if (s.data.userId && s.data.userId !== userId) {
+          const u = await User.findById(s.data.userId).select('name email username avatar');
+          activeUsers.push({
+            userId: s.data.userId,
+            name: u?.name || u?.username || 'Collaborator',
+            avatar: u?.avatar || '',
+            color: getRandomColor(s.data.userId),
+          });
+        }
+      }
+
+      socket.emit('board:joined', { activeUsers, selfProfile: userProfile });
+    } catch (err) {
+      console.error('board:join socket error:', err);
+      socket.emit('board:error', { error: 'An internal server error occurred while joining the board' });
+    }
   });
 
   // Relay Yjs update chunks (Uint8Array format)

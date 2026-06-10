@@ -7,6 +7,8 @@ import {
   deleteTask,
   addCollaborator,
   removeCollaborator,
+  acceptTaskInvitation,
+  rejectTaskInvitation,
 } from './task.controller';
 
 import {
@@ -28,6 +30,9 @@ router.get('/', getTasks);
 router.patch('/:id', updateTask);
 
 router.delete('/:id', deleteTask);
+
+router.post('/invitations/:id/accept', acceptTaskInvitation);
+router.post('/invitations/:id/reject', rejectTaskInvitation);
 
 router.post('/:id/collaborators', addCollaborator);
 router.delete('/:id/collaborators/:userId', removeCollaborator);

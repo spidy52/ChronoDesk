@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { useWorkspaceStore } from '../../../../store/workspaceStore';
+import toast from 'react-hot-toast';
 
 export default function DeleteWorkspaceModal({
   onClose,
@@ -20,10 +21,11 @@ export default function DeleteWorkspaceModal({
     try {
       setLoading(true);
       await deleteWorkspaceById(activeWorkspace._id);
+      toast.success('Workspace deleted successfully');
       onClose();
     } catch (error) {
       console.error(error);
-      alert('Failed to delete workspace');
+      toast.error('Failed to delete workspace');
     } finally {
       setLoading(false);
     }

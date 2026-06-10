@@ -14,6 +14,7 @@ import {
   User,
 } from 'lucide-react';
 import { socket } from '../../../services/socket';
+import toast from 'react-hot-toast';
 
 import {
   useEffect,
@@ -27,7 +28,11 @@ import { api } from '../../../lib/axios';
 
 interface Invitation {
   _id: string;
-  fromUser: {
+  type?: 'member' | 'task';
+  taskTitle?: string;
+
+  fromUser?: {
+    _id: string;
     name: string;
     email: string;
   };
@@ -167,26 +172,32 @@ export default function TopBar({
 
   const acceptInvitation =
     async (id: string) => {
+      const invite = invitations.find((i) => i._id === id);
+      if (!invite) return;
 
       try {
-
-        await api.patch(
-          `/members/accept/${id}`
-        );
+        if (invite.type === 'task') {
+          await api.post(`/tasks/invitations/${id}/accept`);
+        } else {
+          await api.patch(
+            `/members/accept/${id}`
+          );
+        }
 
         setInvitations(
           (prev) =>
             prev.filter(
-              (invite) =>
-                invite._id !== id
+              (i) =>
+                i._id !== id
             )
         );
 
+        toast.success('Invitation accepted successfully');
       } catch (error) {
 
         console.error(error);
 
-        alert(
+        toast.error(
           'Failed to accept invitation'
         );
       }
@@ -196,26 +207,32 @@ export default function TopBar({
 
   const rejectInvitation =
     async (id: string) => {
+      const invite = invitations.find((i) => i._id === id);
+      if (!invite) return;
 
       try {
-
-        await api.patch(
-          `/members/reject/${id}`
-        );
+        if (invite.type === 'task') {
+          await api.post(`/tasks/invitations/${id}/reject`);
+        } else {
+          await api.patch(
+            `/members/reject/${id}`
+          );
+        }
 
         setInvitations(
           (prev) =>
             prev.filter(
-              (invite) =>
-                invite._id !== id
+              (i) =>
+                i._id !== id
             )
         );
 
+        toast.success('Invitation rejected successfully');
       } catch (error) {
 
         console.error(error);
 
-        alert(
+        toast.error(
           'Failed to reject invitation'
         );
       }
@@ -705,7 +722,9 @@ function InvitationCard({
       </div>
 
       <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-        invited you to connect as a friend.
+        {invitation.type === 'task'
+          ? `invited you to collaborate on the task "${invitation.taskTitle}".`
+          : 'invited you to connect as a friend.'}
       </p>
 
       {/* ACTIONS */}

@@ -10,6 +10,9 @@ from '../../models/Member';
 import User
 from '../../models/User';
 
+import Task
+from '../../models/Task';
+
 /* ================= SEND INVITATION ================= */
 
 export const sendInvitation =
@@ -33,6 +36,8 @@ export const sendInvitation =
         return res.status(400).json({
           error:
             'Username is required',
+          message:
+            'Username is required',
         });
       }
 
@@ -47,6 +52,8 @@ export const sendInvitation =
         return res.status(404).json({
           error:
             'User not found',
+          message:
+            'User not found',
         });
       }
 
@@ -57,6 +64,8 @@ export const sendInvitation =
 
         return res.status(400).json({
           error:
+            'Cannot invite yourself',
+          message:
             'Cannot invite yourself',
         });
       }
@@ -80,6 +89,8 @@ export const sendInvitation =
         return res.status(400).json({
           error:
             'Invitation already exists',
+          message:
+            'Invitation already exists',
         });
       }
 
@@ -98,6 +109,7 @@ export const sendInvitation =
         });
 
       res.json({
+        success: true,
         message:
           'Invitation sent successfully',
 
@@ -147,9 +159,32 @@ export const getInvitations =
               -1,
           });
 
-      res.json(
-        invitations
+      // Fetch pending task invitations where req.user.userId is in task.pendingCollaborators
+      const pendingTasks = await Task.find({
+        pendingCollaborators: req.user.userId,
+      }).populate('createdBy', 'name username email');
+
+      const formattedTaskInvites = pendingTasks.map((task) => ({
+        _id: task._id.toString(),
+        type: 'task',
+        fromUser: task.createdBy,
+        taskTitle: task.title,
+        createdAt: task.createdAt,
+      }));
+
+      const formattedMemberInvites = invitations.map((inv) => ({
+        _id: inv._id.toString(),
+        type: 'member',
+        fromUser: inv.fromUser,
+        createdAt: inv.createdAt,
+      }));
+
+      // Combine and sort by date descending
+      const combined = [...formattedMemberInvites, ...formattedTaskInvites].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
+
+      res.json(combined);
 
     } catch (error) {
 

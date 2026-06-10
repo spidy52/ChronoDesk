@@ -5,21 +5,89 @@ import Board from '../../models/Board';
 import BoardEvent from '../../models/BoardEvent';
 import BoardSnapshot from '../../models/BoardSnapshot';
 import TimelineFrame from '../../models/TimelineFrame';
+import Task from '../../models/Task';
+import Members from '../../models/Member';
 import { StorageEngine } from '../../utils/storage';
+
+const checkBoardAccess = async (boardId: string, userId: string) => {
+  if (!boardId || !mongoose.Types.ObjectId.isValid(boardId)) {
+    return { success: false, status: 400, error: 'Valid Board ID is required' };
+  }
+  const board = await Board.findById(boardId);
+  if (!board) {
+    return { success: false, status: 404, error: 'Board not found' };
+  }
+  const task = await Task.findById(board.taskId);
+  if (!task) {
+    return { success: false, status: 404, error: 'Associated task not found' };
+  }
+  const isCreator = task.createdBy.toString() === userId;
+  if (!isCreator) {
+    const isCollab = task.collaborators.some((id: any) => id.toString() === userId);
+    if (!isCollab) {
+      return { success: false, status: 403, error: 'Access denied: You are not a collaborator on this task' };
+    }
+
+    // Verify accepted connection status
+    const isConnected = await Members.findOne({
+      $or: [
+        { fromUser: task.createdBy, toUser: userId },
+        { fromUser: userId, toUser: task.createdBy }
+      ],
+      status: 'accepted'
+    });
+
+    if (!isConnected) {
+      return { success: false, status: 403, error: 'Access denied: Connection invitation is not accepted' };
+    }
+  }
+  return { success: true, board };
+};
 
 /**
  * Get or create whiteboard connected to a task
  */
 export const getOrCreateBoard = async (req: AuthRequest, res: Response) => {
   try {
-    const { taskId } = req.params;
+    const taskId = req.params.taskId as string;
     const { title, workspaceId } = req.body;
+    const userId = req.user?.userId;
 
-    if (!taskId) {
-      return res.status(400).json({ success: false, error: 'Task ID is required' });
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
-    let board = await Board.findOne({ taskId: new mongoose.Types.ObjectId(taskId as string) });
+    if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
+      return res.status(400).json({ success: false, error: 'Valid Task ID is required' });
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ success: false, error: 'Task not found' });
+    }
+
+    const isCreator = task.createdBy.toString() === userId;
+    if (!isCreator) {
+      const isCollab = task.collaborators.some((id: any) => id.toString() === userId);
+      if (!isCollab) {
+        return res.status(403).json({ success: false, error: 'Access denied: You are not a collaborator on this task' });
+      }
+
+      // Verify accepted connection status
+      const isConnected = await Members.findOne({
+        $or: [
+          { fromUser: task.createdBy, toUser: userId },
+          { fromUser: userId, toUser: task.createdBy }
+        ],
+        status: 'accepted'
+      });
+
+      if (!isConnected) {
+        return res.status(403).json({ success: false, error: 'Access denied: Connection invitation is not accepted' });
+      }
+    }
+
+    let board = await Board.findOne({ taskId: new mongoose.Types.ObjectId(taskId) });
 
     if (!board) {
       if (!title || !workspaceId) {
@@ -31,9 +99,9 @@ export const getOrCreateBoard = async (req: AuthRequest, res: Response) => {
 
       board = await Board.create({
         title,
-        taskId: new mongoose.Types.ObjectId(taskId as string),
+        taskId: new mongoose.Types.ObjectId(taskId),
         workspaceId,
-        createdBy: new mongoose.Types.ObjectId(req.user?.userId as string),
+        createdBy: new mongoose.Types.ObjectId(userId),
       });
       console.log(`Created new board: ${board._id} for task ${taskId}`);
     }
@@ -50,12 +118,22 @@ export const getOrCreateBoard = async (req: AuthRequest, res: Response) => {
  */
 export const getEvents = async (req: AuthRequest, res: Response) => {
   try {
-    const { boardId } = req.params;
+    const boardId = req.params.boardId as string;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const access = await checkBoardAccess(boardId, userId);
+    if (!access.success) {
+      return res.status(access.status || 400).json({ success: false, error: access.error });
+    }
+
     const since = Number(req.query.since) || 0;
     const until = req.query.until ? Number(req.query.until) : Date.now();
 
     const events = await BoardEvent.find({
-      boardId: new mongoose.Types.ObjectId(boardId as string),
+      boardId: new mongoose.Types.ObjectId(boardId),
       timestamp: { $gt: since, $lte: until },
     }).sort({ timestamp: 1 });
 
@@ -71,12 +149,22 @@ export const getEvents = async (req: AuthRequest, res: Response) => {
  */
 export const getSnapshot = async (req: AuthRequest, res: Response) => {
   try {
-    const { boardId } = req.params;
+    const boardId = req.params.boardId as string;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const access = await checkBoardAccess(boardId, userId);
+    if (!access.success) {
+      return res.status(access.status || 400).json({ success: false, error: access.error });
+    }
+
     const timestamp = req.query.timestamp ? Number(req.query.timestamp) : Date.now();
 
     // Find nearest snapshot before or equal to target timestamp
     const snapshotMeta = await BoardSnapshot.findOne({
-      boardId: new mongoose.Types.ObjectId(boardId as string),
+      boardId: new mongoose.Types.ObjectId(boardId),
       timestamp: { $lte: timestamp },
     }).sort({ timestamp: -1 });
 
@@ -112,7 +200,17 @@ export const getSnapshot = async (req: AuthRequest, res: Response) => {
  */
 export const saveSnapshot = async (req: AuthRequest, res: Response) => {
   try {
-    const { boardId } = req.params;
+    const boardId = req.params.boardId as string;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const access = await checkBoardAccess(boardId, userId);
+    if (!access.success) {
+      return res.status(access.status || 400).json({ success: false, error: access.error });
+    }
+
     const { timestamp, elements } = req.body;
 
     if (!timestamp || !elements) {
@@ -126,7 +224,7 @@ export const saveSnapshot = async (req: AuthRequest, res: Response) => {
     const fileUrl = await StorageEngine.saveFile('snapshots', filename, serializedData);
 
     const snapshot = await BoardSnapshot.create({
-      boardId: new mongoose.Types.ObjectId(boardId as string),
+      boardId: new mongoose.Types.ObjectId(boardId),
       timestamp,
       snapshotUrl: fileUrl,
     });
@@ -143,9 +241,18 @@ export const saveSnapshot = async (req: AuthRequest, res: Response) => {
  */
 export const getTimelineFrames = async (req: AuthRequest, res: Response) => {
   try {
-    const { boardId } = req.params;
+    const boardId = req.params.boardId as string;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
 
-    const frames = await TimelineFrame.find({ boardId: new mongoose.Types.ObjectId(boardId as string) }).sort({ timestamp: 1 });
+    const access = await checkBoardAccess(boardId, userId);
+    if (!access.success) {
+      return res.status(access.status || 400).json({ success: false, error: access.error });
+    }
+
+    const frames = await TimelineFrame.find({ boardId: new mongoose.Types.ObjectId(boardId) }).sort({ timestamp: 1 });
 
     res.json({ success: true, frames });
   } catch (error: any) {
@@ -159,7 +266,17 @@ export const getTimelineFrames = async (req: AuthRequest, res: Response) => {
  */
 export const saveTimelineFrame = async (req: AuthRequest, res: Response) => {
   try {
-    const { boardId } = req.params;
+    const boardId = req.params.boardId as string;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const access = await checkBoardAccess(boardId, userId);
+    if (!access.success) {
+      return res.status(access.status || 400).json({ success: false, error: access.error });
+    }
+
     const { timestamp, thumbnailData } = req.body; // base64 string
 
     if (!timestamp || !thumbnailData) {
@@ -179,7 +296,7 @@ export const saveTimelineFrame = async (req: AuthRequest, res: Response) => {
     const fileUrl = await StorageEngine.saveFile('thumbnails', filename, buffer);
 
     const frame = await TimelineFrame.create({
-      boardId: new mongoose.Types.ObjectId(boardId as string),
+      boardId: new mongoose.Types.ObjectId(boardId),
       timestamp,
       thumbnailUrl: fileUrl,
     });
@@ -196,7 +313,17 @@ export const saveTimelineFrame = async (req: AuthRequest, res: Response) => {
  */
 export const uploadImage = async (req: AuthRequest, res: Response) => {
   try {
-    const { boardId } = req.params;
+    const boardId = req.params.boardId as string;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const access = await checkBoardAccess(boardId, userId);
+    if (!access.success) {
+      return res.status(access.status || 400).json({ success: false, error: access.error });
+    }
+
     const { base64Data, mimeType } = req.body;
 
     if (!base64Data || !mimeType) {

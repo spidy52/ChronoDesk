@@ -334,7 +334,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
     
     // Generate a temporary 1h reset token
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
-    const resetUrl = `http://localhost:5173/reset-password/${token}`;
+    const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetUrl = `${frontendBaseUrl}/reset-password/${token}`;
     
     // Send email using Nodemailer utility
     const html = getResetPasswordHtml(resetUrl);
@@ -352,8 +353,6 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     res.json({
       message: 'Password reset link sent successfully',
-      token,
-      resetUrl: previewUrl || resetUrl, // fallback/preview url for dev
     });
   } catch (error) {
     console.error('ForgotPassword error:', error);

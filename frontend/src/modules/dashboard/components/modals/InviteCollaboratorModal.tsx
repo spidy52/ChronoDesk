@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Check, UserPlus } from 'lucide-react';
+import { X, Search, Check, UserPlus, Clock } from 'lucide-react';
 import { api } from '../../../../lib/axios';
 import { useTaskStore } from '../../../../store/useTaskStore';
 
@@ -36,9 +36,13 @@ export default function InviteCollaboratorModal({
     return task.collaborators?.some((c: any) => (c._id || c) === userId);
   };
 
+  const isPendingCollaborator = (userId: string) => {
+    return task.pendingCollaborators?.some((c: any) => (c._id || c) === userId);
+  };
+
   const handleToggleCollaborator = async (userId: string) => {
     try {
-      if (isCollaborator(userId)) {
+      if (isCollaborator(userId) || isPendingCollaborator(userId)) {
         await removeCollaboratorFromTask(task._id, userId);
       } else {
         await addCollaboratorToTask(task._id, userId);
@@ -54,8 +58,17 @@ export default function InviteCollaboratorModal({
   );
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-6 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-3xl p-6 shadow-2xl relative">
+    <div 
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+      className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-6 backdrop-blur-sm"
+    >
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-3xl p-6 shadow-2xl relative"
+      >
         
         {/* HEADER */}
         <div className="flex items-center justify-between mb-6">
@@ -116,11 +129,20 @@ export default function InviteCollaboratorModal({
                     w-8 h-8 rounded-full flex items-center justify-center transition-all border
                     ${isCollaborator(member.userId) 
                       ? 'bg-primary border-primary text-primary-foreground' 
-                      : 'border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500'
+                      : isPendingCollaborator(member.userId)
+                        ? 'bg-amber-500/10 border-amber-500/35 text-amber-500 hover:bg-amber-500/25'
+                        : 'border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500'
                     }
                   `}
+                  title={isPendingCollaborator(member.userId) ? 'Pending Acceptance' : 'Add Collaborator'}
                 >
-                  {isCollaborator(member.userId) ? <Check size={14} /> : <PlusIcon />}
+                  {isCollaborator(member.userId) ? (
+                    <Check size={14} />
+                  ) : isPendingCollaborator(member.userId) ? (
+                    <Clock size={14} />
+                  ) : (
+                    <PlusIcon />
+                  )}
                 </button>
               </div>
             ))

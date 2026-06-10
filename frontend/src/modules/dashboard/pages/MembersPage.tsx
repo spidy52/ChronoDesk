@@ -14,9 +14,11 @@ import {
   User,
   Mail,
   X,
+  Trash2,
 } from 'lucide-react';
 
 import { socket } from '../../../services/socket';
+import toast from 'react-hot-toast';
 
 interface Member {
   _id: string;
@@ -142,7 +144,7 @@ export default function MembersPage() {
     async () => {
       try {
         if (!inviteData.username) {
-          return alert(
+          return toast.error(
             'Username required'
           );
         }
@@ -152,7 +154,7 @@ export default function MembersPage() {
           inviteData
         );
 
-        alert(
+        toast.success(
           'Invitation sent successfully'
         );
 
@@ -165,7 +167,7 @@ export default function MembersPage() {
       } catch (error: any) {
         console.error(error);
 
-        alert(
+        toast.error(
           error?.response?.data
             ?.message ||
             'Failed to send invitation'
@@ -178,13 +180,6 @@ export default function MembersPage() {
   const removeMember =
     async (id: string) => {
       try {
-        const confirmDelete =
-          window.confirm(
-            'Remove this member?'
-          );
-
-        if (!confirmDelete) return;
-
         await api.delete(
           `/members/${id}`
         );
@@ -195,10 +190,11 @@ export default function MembersPage() {
               member._id !== id
           )
         );
+        toast.success('Member removed successfully');
       } catch (error) {
         console.error(error);
 
-        alert(
+        toast.error(
           'Failed to remove member'
         );
       }
@@ -583,9 +579,39 @@ function MemberCard({
 
   onRemove: (id: string) => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  if (confirmDelete) {
+    return (
+      <div className="bg-card border border-red-500/25 rounded-3xl p-6 hover:shadow-xl transition-all flex flex-col justify-between min-h-[160px]">
+        <div>
+          <h3 className="text-lg font-bold text-red-500 flex items-center gap-2">
+            <Trash2 size={18} />
+            Remove Connection?
+          </h3>
+          <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+            Are you sure you want to remove <strong>{member.name}</strong> from your workspace members?
+          </p>
+        </div>
+        <div className="flex items-center gap-3 mt-6">
+          <button
+            onClick={() => onRemove(member._id)}
+            className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-all shadow-md active:scale-[0.98]"
+          >
+            Yes, Remove
+          </button>
+          <button
+            onClick={() => setConfirmDelete(false)}
+            className="flex-1 py-2.5 px-4 rounded-xl border border-border hover:bg-secondary text-sm font-semibold transition-all active:scale-[0.98]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-
     <div className="bg-card border rounded-3xl p-6 hover:shadow-xl transition-all">
 
       {/* TOP */}
@@ -642,11 +668,12 @@ function MemberCard({
 
         <button
           onClick={() =>
-            onRemove(member._id)
+            setConfirmDelete(true)
           }
           className="w-10 h-10 rounded-2xl hover:bg-red-500/10 hover:text-red-500 flex items-center justify-center transition-all"
+          title="Remove Member"
         >
-          <MoreVertical size={18} />
+          <Trash2 size={18} />
         </button>
       </div>
 

@@ -100,7 +100,7 @@ export function getResetPasswordHtml(resetUrl: string): string {
       
       <!-- Action Button -->
       <div class="btn-container" style="text-align: center; margin: 32px 0;">
-        <a href="\${resetUrl}" target="_blank" style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: #ffffff !important; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.2s ease;">Reset Password</a>
+        <a href="${resetUrl}" target="_blank" style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: #ffffff !important; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 12px; display: inline-block; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.2s ease;">Reset Password</a>
       </div>
       
       <p style="color: #94a3b8; font-size: 15px; line-height: 24px; margin-top: 0; margin-bottom: 0;">If you did not request a password reset, you can safely ignore this email. Your account remains secure and no changes have been made.</p>

@@ -9,21 +9,16 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [resetToken, setResetToken] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
     setSuccess('');
-    setResetToken('');
 
     try {
-      const response = await api.post('/auth/forgot-password', { email });
-      setSuccess('Reset link generated successfully! (Logged to server console)');
-      if (response.data?.token) {
-        setResetToken(response.data.token);
-      }
+      await api.post('/auth/forgot-password', { email });
+      setSuccess('A password reset link has been sent to your email address. Please check your inbox.');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to request password reset');
     } finally {
@@ -59,19 +54,8 @@ export default function ForgotPasswordPage() {
         )}
 
         {success && (
-          <div className="p-3 text-sm text-emerald-500 bg-emerald-500/10 rounded-xl border border-emerald-500/20 space-y-2">
-            <div>{success}</div>
-            {resetToken && (
-              <div className="pt-2 border-t border-emerald-500/20">
-                <span className="font-semibold block mb-1">Local Testing Link:</span>
-                <Link
-                  to={`/reset-password/${resetToken}`}
-                  className="text-purple-500 hover:text-purple-400 font-bold underline break-all text-xs"
-                >
-                  Click here to Reset Password directly
-                </Link>
-              </div>
-            )}
+          <div className="p-3 text-sm text-emerald-500 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+            {success}
           </div>
         )}
 

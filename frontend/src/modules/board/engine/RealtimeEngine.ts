@@ -112,6 +112,7 @@ class RealtimeEngineClass {
       socket.off('board:user-left');
       socket.off('element:commit-success');
       socket.off('board:clear-success');
+      socket.off('board:error');
     }
     
     this.currentBoardId = null;
@@ -139,6 +140,11 @@ class RealtimeEngineClass {
   }
 
   private registerSocketListeners(boardId: string) {
+    socket.on('board:error', ({ error }) => {
+      useBoardStore.getState().setError(error);
+      useBoardStore.getState().setSyncStatus('disconnected');
+    });
+
     // 1. Initial connection response
     socket.on('board:joined', async ({ activeUsers, selfProfile }) => {
       useBoardStore.getState().setSyncStatus('connected');

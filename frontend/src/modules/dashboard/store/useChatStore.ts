@@ -526,6 +526,8 @@ export const useChatStore =
                 const updatedChats = state.chats.map((chat) => {
                   if (chat._id === message.chatId) {
                     const isCurrent = state.currentChat?._id === message.chatId;
+                    const currentUserId = useAuthStore.getState().user?.id || useAuthStore.getState().user?._id;
+                    const isFromMe = !!(currentUserId && message.senderId.toString() === currentUserId.toString());
                     return {
                       ...chat,
                       lastMessage: {
@@ -535,7 +537,7 @@ export const useChatStore =
                         readAt: message.readAt,
                         deliveredAt: message.deliveredAt,
                       },
-                      unreadCount: isCurrent ? 0 : (chat.unreadCount || 0) + 1,
+                      unreadCount: (isCurrent || isFromMe) ? (chat.unreadCount || 0) : (chat.unreadCount || 0) + 1,
                     };
                   }
                   return chat;

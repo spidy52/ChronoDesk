@@ -75,6 +75,10 @@ export default function TaskCard({
   const { user } = useAuthStore();
   const navigate = useNavigate();
 
+  const taskCreatorId = task.createdBy?._id || task.createdBy;
+  const currentUserId = user?.id || user?._id;
+  const isCreator = !!(taskCreatorId && currentUserId && taskCreatorId.toString() === currentUserId.toString());
+
   /* ================= STATES ================= */
 
   const [editing, setEditing] =
@@ -448,27 +452,29 @@ export default function TaskCard({
               </>
             )}
 
-            <button
-              onClick={
-                handleDelete
-              }
-              className="
-                w-8
-                h-8
-                rounded-full
-                hover:bg-red-500/10
-                flex
-                items-center
-                justify-center
-                text-muted-foreground
-                hover:text-red-500
-                transition-all
-              "
-            >
-              <Trash2
-                size={16}
-              />
-            </button>
+            {isCreator && (
+              <button
+                onClick={
+                  handleDelete
+                }
+                className="
+                  w-8
+                  h-8
+                  rounded-full
+                  hover:bg-red-500/10
+                  flex
+                  items-center
+                  justify-center
+                  text-muted-foreground
+                  hover:text-red-500
+                  transition-all
+                "
+              >
+                <Trash2
+                  size={16}
+                />
+              </button>
+            )}
           </div>
         </div>
 
@@ -654,13 +660,15 @@ export default function TaskCard({
               </div>
             ))}
             
-            <button
-              onClick={() => setIsInviteModalOpen(true)}
-              className="w-7 h-7 rounded-full border-2 border-card bg-secondary hover:bg-primary/20 hover:text-primary flex items-center justify-center text-muted-foreground transition-all z-20"
-              title="Add Collaborator"
-            >
-              <Plus size={12} />
-            </button>
+            {isCreator && (
+              <button
+                onClick={() => setIsInviteModalOpen(true)}
+                className="w-7 h-7 rounded-full border-2 border-card bg-secondary hover:bg-primary/20 hover:text-primary flex items-center justify-center text-muted-foreground transition-all z-20"
+                title="Add Collaborator"
+              >
+                <Plus size={12} />
+              </button>
+            )}
           </div>
         </div>
       </div>
