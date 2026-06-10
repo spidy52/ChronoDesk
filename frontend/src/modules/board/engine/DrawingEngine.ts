@@ -140,7 +140,8 @@ export const DrawingEngine = {
     y: number,
     color: string,
     fontSize: number,
-    userId: string
+    userId: string,
+    fontFamily?: string
   ): TextElement {
     return {
       id: uuidv4(),
@@ -152,6 +153,7 @@ export const DrawingEngine = {
       text,
       color,
       fontSize,
+      fontFamily,
       timestamp: Date.now(),
       userId,
     };

@@ -40,6 +40,8 @@ export default function WhiteboardPage() {
     syncStatus,
     isReplayMode,
     error,
+    textFontFamily,
+    textFontSize,
     setBoard,
     setElements,
     setSelectedIds,
@@ -48,6 +50,8 @@ export default function WhiteboardPage() {
     setActiveTool,
     setStrokeColor,
     setBrushWidth,
+    setTextFontFamily,
+    setTextFontSize,
     setError,
   } = useBoardStore();
 
@@ -359,7 +363,9 @@ export default function WhiteboardPage() {
     if (!stage) return;
 
     const touches = e.evt.touches;
-    if (touches.length === 2) {
+    if (touches.length === 1) {
+      handleStageMouseDown(e);
+    } else if (touches.length === 2) {
       const p1 = { x: touches[0].clientX, y: touches[0].clientY };
       const p2 = { x: touches[1].clientX, y: touches[1].clientY };
       
@@ -384,7 +390,12 @@ export default function WhiteboardPage() {
     if (!stage) return;
 
     const touches = e.evt.touches;
-    if (touches.length === 2 && lastTouchDist !== null && lastTouchCenter !== null) {
+    if (touches.length === 1) {
+      if (activeTool !== 'pan') {
+        e.evt.preventDefault(); // prevent screen scrolling when drawing/interacting
+      }
+      handleStageMouseMove();
+    } else if (touches.length === 2 && lastTouchDist !== null && lastTouchCenter !== null) {
       e.evt.preventDefault(); // prevent browser pinch zoom
 
       const p1 = { x: touches[0].clientX, y: touches[0].clientY };
@@ -420,7 +431,11 @@ export default function WhiteboardPage() {
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: any) => {
+    const touches = e.evt.touches;
+    if (touches.length === 0) {
+      handleStageMouseUp();
+    }
     setLastTouchDist(null);
     setLastTouchCenter(null);
   };
@@ -501,6 +516,11 @@ export default function WhiteboardPage() {
     // 2. Select tool click detects select bounds
     if (activeTool === 'select') {
       const clickedEl = elements.find((el) => {
+        const isSelected = selectedIds.includes(el.id);
+        if (isSelected) {
+          // If already selected, allow clicking anywhere inside its box to drag it
+          return DrawingEngine.intersectsBox(worldPos.x, worldPos.y, el);
+        }
         if (el.tool === 'pencil' || el.tool === 'marker') {
           return DrawingEngine.intersectsStroke(worldPos.x, worldPos.y, el as any);
         }
@@ -508,15 +528,9 @@ export default function WhiteboardPage() {
       });
 
       if (clickedEl) {
-        if (selectedIds.includes(clickedEl.id)) {
-          // Setup dragging parameters for item movement if already selected
-          setDragStart({ x: worldPos.x, y: worldPos.y });
-          setHasDragged(false);
-        } else {
-          // Single click on a non-selected item unselects everything (double click to select)
-          setSelectedIds([]);
-          setDragStart(null);
-        }
+        setSelectedIds([clickedEl.id]);
+        setDragStart({ x: worldPos.x, y: worldPos.y });
+        setHasDragged(false);
       } else {
         setSelectedIds([]);
         // Start dragging lasso selection rectangle
@@ -788,6 +802,32 @@ export default function WhiteboardPage() {
     });
   };
 
+  const handleFontFamilyChange = (font: string) => {
+    setTextFontFamily(font);
+    if (selectedElement && selectedElement.tool === 'text') {
+      const updated = {
+        ...selectedElement,
+        fontFamily: font,
+      } as BoardElement;
+      RealtimeEngine.updateElementLocally(updated);
+      RealtimeEngine.commitElement('UPDATE_ELEMENT', updated);
+      SnapshotEngine.logEvent();
+    }
+  };
+
+  const handleFontSizeChange = (size: number) => {
+    setTextFontSize(size);
+    if (selectedElement && selectedElement.tool === 'text') {
+      const updated = {
+        ...selectedElement,
+        fontSize: size,
+      } as BoardElement;
+      RealtimeEngine.updateElementLocally(updated);
+      RealtimeEngine.commitElement('UPDATE_ELEMENT', updated);
+      SnapshotEngine.logEvent();
+    }
+  };
+
   // Commit text from input editor overlay
   const handleTextCommit = () => {
     if (!textInput || !board) return;
@@ -810,8 +850,9 @@ export default function WhiteboardPage() {
           textInput.wx,
           textInput.wy,
           strokeColor,
-          24, // fontSize
-          selfProfile?.userId || 'unknown'
+          textFontSize,
+          selfProfile?.userId || 'unknown',
+          textFontFamily
         );
         RealtimeEngine.commitElement('CREATE_ELEMENT', textNode);
         SnapshotEngine.logEvent();
@@ -1277,6 +1318,48 @@ export default function WhiteboardPage() {
               </div>
             )}
 
+            {(activeTool === 'text' || (selectedElement && selectedElement.tool === 'text')) && (
+              <div className={`flex flex-col gap-2 border-t ${isDark ? 'border-zinc-900' : 'border-zinc-100'} pt-2`}>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-sans">Font</span>
+                  <select
+                    value={selectedElement && selectedElement.tool === 'text' ? ((selectedElement as any).fontFamily || textFontFamily) : textFontFamily}
+                    onChange={(e) => handleFontFamilyChange(e.target.value)}
+                    className={`px-2 py-1 rounded-lg border text-[10px] outline-none font-sans ${isDark ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'}`}
+                  >
+                    <option value="Outfit, Inter, sans-serif">Outfit</option>
+                    <option value="Inter, sans-serif">Inter</option>
+                    <option value="Georgia, serif">Georgia</option>
+                    <option value="Courier New, monospace">Courier</option>
+                    <option value="Comic Sans MS, cursive">Comic Sans</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-sans">Size</span>
+                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5">
+                    {[16, 20, 24, 32, 40, 48, 64].map((size) => {
+                      const currentSize = selectedElement && selectedElement.tool === 'text' ? ((selectedElement as any).fontSize || 24) : textFontSize;
+                      const isSizeSelected = currentSize === size;
+                      return (
+                        <button
+                          key={size}
+                          onClick={() => handleFontSizeChange(size)}
+                          className={`px-2 py-0.5 rounded border text-[9px] font-mono font-bold transition-all ${
+                            isSizeSelected 
+                              ? 'bg-blue-600 border-blue-500 text-white' 
+                              : (isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-400' : 'bg-zinc-50 border-zinc-200 text-zinc-600')
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {selectedElement && (selectedElement.tool === 'text' || selectedElement.tool === 'sticky') && (
               <div className={`flex flex-col gap-1 border-t ${isDark ? 'border-zinc-900' : 'border-zinc-100'} pt-2`}>
                 <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
@@ -1419,70 +1502,63 @@ export default function WhiteboardPage() {
                 const isSelected = selectedIds.includes(el.id);
                 
                 return (
-                  <Group key={el.id}>
+                  <Group
+                    key={el.id}
+                    id={el.id}
+                    x={el.x}
+                    y={el.y}
+                    scaleX={el.scaleX ?? 1}
+                    scaleY={el.scaleY ?? 1}
+                    rotation={el.rotation ?? 0}
+                    onTransformEnd={handleTransformEnd}
+                  >
                     {/* Pencil and marker freehand vector path */}
                     {(el.tool === 'pencil' || el.tool === 'marker') && (
                       <Path
-                        id={el.id}
-                        x={el.x}
-                        y={el.y}
-                        scaleX={el.scaleX ?? 1}
-                        scaleY={el.scaleY ?? 1}
-                        rotation={el.rotation ?? 0}
+                        x={0}
+                        y={0}
+                        scaleX={1}
+                        scaleY={1}
+                        rotation={0}
                         data={DrawingEngine.getFreehandPath((el as any).points, (el as any).strokeWidth ?? 4, el.tool === 'marker')}
                         fill={el.color}
                         opacity={el.tool === 'marker' ? 0.6 : 1}
-                        onTransformEnd={handleTransformEnd}
                       />
                     )}
 
                     {/* Rectangle rendering */}
                     {el.tool === 'rect' && (
                       <Rect
-                        id={el.id}
-                        x={el.x}
-                        y={el.y}
+                        x={0}
+                        y={0}
                         width={el.width}
                         height={el.height}
                         stroke={el.color}
                         strokeWidth={(el as any).strokeWidth || 4}
                         fill={(el as any).fill || 'transparent'}
                         cornerRadius={4}
-                        rotation={el.rotation ?? 0}
-                        onTransformEnd={handleTransformEnd}
                       />
                     )}
 
                     {/* Circle rendering */}
                     {el.tool === 'circle' && (
-                      <Group
-                        id={el.id}
-                        x={el.x}
-                        y={el.y}
+                      <Circle
+                        x={el.width / 2}
+                        y={el.height / 2}
                         width={el.width}
                         height={el.height}
-                        rotation={el.rotation ?? 0}
-                        onTransformEnd={handleTransformEnd}
-                      >
-                        <Circle
-                          x={el.width / 2}
-                          y={el.height / 2}
-                          width={el.width}
-                          height={el.height}
-                          radius={el.width / 2}
-                          stroke={el.color}
-                          strokeWidth={(el as any).strokeWidth || 4}
-                          fill={(el as any).fill || 'transparent'}
-                        />
-                      </Group>
+                        radius={el.width / 2}
+                        stroke={el.color}
+                        strokeWidth={(el as any).strokeWidth || 4}
+                        fill={(el as any).fill || 'transparent'}
+                      />
                     )}
 
                     {/* Triangle rendering */}
                     {el.tool === 'triangle' && (
                       <Line
-                        id={el.id}
-                        x={el.x}
-                        y={el.y}
+                        x={0}
+                        y={0}
                         width={el.width}
                         height={el.height}
                         points={[
@@ -1494,33 +1570,27 @@ export default function WhiteboardPage() {
                         stroke={el.color}
                         strokeWidth={(el as any).strokeWidth || 4}
                         fill={(el as any).fill || 'transparent'}
-                        rotation={el.rotation ?? 0}
-                        onTransformEnd={handleTransformEnd}
                       />
                     )}
 
                     {/* Line rendering */}
                     {el.tool === 'line' && (
                       <Line
-                        id={el.id}
-                        x={el.x}
-                        y={el.y}
+                        x={0}
+                        y={0}
                         width={el.width}
                         height={el.height}
                         points={[0, 0, el.width, el.height]}
                         stroke={el.color}
                         strokeWidth={(el as any).strokeWidth || 4}
-                        rotation={el.rotation ?? 0}
-                        onTransformEnd={handleTransformEnd}
                       />
                     )}
 
                     {/* Arrow rendering */}
                     {el.tool === 'arrow' && (
                       <Arrow
-                        id={el.id}
-                        x={el.x}
-                        y={el.y}
+                        x={0}
+                        y={0}
                         width={el.width}
                         height={el.height}
                         points={[0, 0, el.width, el.height]}
@@ -1529,38 +1599,30 @@ export default function WhiteboardPage() {
                         strokeWidth={(el as any).strokeWidth || 4}
                         pointerLength={Math.max(10, ((el as any).strokeWidth || 4) * 2.5)}
                         pointerWidth={Math.max(10, ((el as any).strokeWidth || 4) * 2.5)}
-                        rotation={el.rotation ?? 0}
-                        onTransformEnd={handleTransformEnd}
                       />
                     )}
 
                     {/* Text block rendering */}
                     {el.tool === 'text' && (
                       <KonvaText
-                        id={el.id}
-                        x={el.x}
-                        y={el.y}
+                        x={0}
+                        y={0}
                         width={el.width}
                         height={el.height}
                         text={(el as any).text}
                         fontSize={(el as any).fontSize || 24}
                         fill={el.color}
-                        fontFamily="Outfit, Inter, sans-serif"
-                        rotation={el.rotation ?? 0}
-                        onTransformEnd={handleTransformEnd}
+                        fontFamily={(el as any).fontFamily || "Outfit, Inter, sans-serif"}
                       />
                     )}
 
                     {/* Sticky note element */}
                     {el.tool === 'sticky' && (
                       <Group
-                        id={el.id}
-                        x={el.x}
-                        y={el.y}
+                        x={0}
+                        y={0}
                         width={el.width}
                         height={el.height}
-                        rotation={el.rotation ?? 0}
-                        onTransformEnd={handleTransformEnd}
                       >
                         <Rect
                           x={0}
@@ -1590,25 +1652,19 @@ export default function WhiteboardPage() {
                     {/* Image rendering */}
                     {el.tool === 'image' && (
                       <WhiteboardImage 
-                        id={el.id}
                         el={el as ImageElement} 
-                        rotation={el.rotation}
-                        onTransformEnd={handleTransformEnd}
                       />
                     )}
 
                     {/* Select outline bounds */}
                     {isSelected && (
                       <Rect
-                        x={el.x}
-                        y={el.y}
+                        x={0}
+                        y={0}
                         offsetX={el.width < 0 ? -el.width + 6 : 6}
                         offsetY={el.height < 0 ? -el.height + 6 : 6}
                         width={Math.abs(el.width) + 12}
                         height={Math.abs(el.height) + 12}
-                        scaleX={el.scaleX ?? 1}
-                        scaleY={el.scaleY ?? 1}
-                        rotation={el.rotation ?? 0}
                         stroke="#3b82f6"
                         strokeWidth={1.5}
                         dash={[6, 4]}
@@ -1824,6 +1880,50 @@ export default function WhiteboardPage() {
                 </>
               )}
 
+              {(activeTool === 'text' || (selectedElement && selectedElement.tool === 'text')) && (
+                <>
+                  <div className={`w-full h-px ${isDark ? 'bg-zinc-900' : 'bg-zinc-200'} my-1`}></div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-sans">Font Family</span>
+                    <select
+                      value={selectedElement && selectedElement.tool === 'text' ? ((selectedElement as any).fontFamily || textFontFamily) : textFontFamily}
+                      onChange={(e) => handleFontFamilyChange(e.target.value)}
+                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs outline-none focus:border-blue-500 font-sans ${isDark ? 'bg-zinc-950 border-zinc-800 text-zinc-100' : 'bg-white border-zinc-200 text-zinc-900'}`}
+                    >
+                      <option value="Outfit, Inter, sans-serif">Outfit</option>
+                      <option value="Inter, sans-serif">Inter</option>
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="Courier New, monospace">Courier</option>
+                      <option value="Comic Sans MS, cursive">Comic Sans</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider font-sans">Font Size</span>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[16, 20, 24, 32, 40, 48, 64, 80].map((size) => {
+                        const currentSize = selectedElement && selectedElement.tool === 'text' ? ((selectedElement as any).fontSize || 24) : textFontSize;
+                        const isSizeSelected = currentSize === size;
+                        return (
+                          <button
+                            key={size}
+                            onClick={() => handleFontSizeChange(size)}
+                            className={`py-1 rounded-lg border text-[10px] font-mono font-bold transition-all ${
+                              isSizeSelected 
+                                ? 'bg-blue-600 border-blue-500 text-white shadow-md' 
+                                : (isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200' : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:text-black')
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
               {selectedElement && (selectedElement.tool === 'text' || selectedElement.tool === 'sticky') && (
                 <>
                   <div className={`w-full h-px ${isDark ? 'bg-zinc-900' : 'bg-zinc-200'} my-1`}></div>
@@ -1949,7 +2049,7 @@ export default function WhiteboardPage() {
   );
 }
 
-function WhiteboardImage({ el, id, rotation, onTransformEnd }: { el: ImageElement; id?: string; rotation?: number; onTransformEnd?: (e: any) => void }) {
+function WhiteboardImage({ el }: { el: ImageElement }) {
   const [imageEl, setImageEl] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -1966,14 +2066,11 @@ function WhiteboardImage({ el, id, rotation, onTransformEnd }: { el: ImageElemen
 
   return (
     <KonvaImage
-      id={id}
-      x={el.x}
-      y={el.y}
+      x={0}
+      y={0}
       width={el.width}
       height={el.height}
       image={imageEl}
-      rotation={rotation ?? 0}
-      onTransformEnd={onTransformEnd}
     />
   );
 }

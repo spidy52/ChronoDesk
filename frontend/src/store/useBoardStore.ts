@@ -20,6 +20,8 @@ interface BoardState {
   strokeColor: string;
   fillColor: string;
   brushWidth: number;
+  textFontFamily: string;
+  textFontSize: number;
   
   // Multiplayer
   collaborators: Record<string, Collaborator>;
@@ -48,6 +50,8 @@ interface BoardState {
   setStrokeColor: (color: string) => void;
   setFillColor: (color: string) => void;
   setBrushWidth: (width: number) => void;
+  setTextFontFamily: (font: string) => void;
+  setTextFontSize: (size: number) => void;
   
   // Sockets & Collaborators
   setSyncStatus: (status: 'disconnected' | 'connecting' | 'connected') => void;
@@ -84,6 +88,8 @@ export const useBoardStore = create<BoardState>((set) => ({
   strokeColor: '#3b82f6', // Premium blue
   fillColor: '#3b82f622', // Translucent blue
   brushWidth: 4,
+  textFontFamily: 'Outfit',
+  textFontSize: 24,
   
   collaborators: {},
   selfProfile: null,
@@ -130,6 +136,8 @@ export const useBoardStore = create<BoardState>((set) => ({
   setStrokeColor: (strokeColor) => set({ strokeColor }),
   setFillColor: (fillColor) => set({ fillColor }),
   setBrushWidth: (brushWidth) => set({ brushWidth }),
+  setTextFontFamily: (textFontFamily) => set({ textFontFamily }),
+  setTextFontSize: (textFontSize) => set({ textFontSize }),
   
   setSyncStatus: (syncStatus) => set({ syncStatus }),
   setSelfProfile: (selfProfile) => set({ selfProfile }),

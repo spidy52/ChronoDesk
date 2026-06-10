@@ -33,6 +33,7 @@ export interface TextElement extends BaseElement {
   tool: 'text';
   text: string;
   fontSize: number;
+  fontFamily?: string;
 }
 
 export interface StickyElement extends BaseElement {
