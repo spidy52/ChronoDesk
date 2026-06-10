@@ -480,7 +480,10 @@ export default function WhiteboardPage() {
 
   const handleStageMouseDown = (e: any) => {
     if (isReplayMode) return; // Read-only during timeline seek
-    if (textInput) return; // Ignore canvas clicks during active editing to avoid race condition w/ blur
+    if (textInput) {
+      handleTextCommit();
+      return;
+    }
     if (e.target.getParent()?.className === 'Transformer') return;
 
     const stage = stageRef.current;
@@ -831,10 +834,14 @@ export default function WhiteboardPage() {
   // Commit text from input editor overlay
   const handleTextCommit = () => {
     if (!textInput || !board) return;
+    const currentInput = textInput;
+    setTextInput(null);
+    setActiveTool('select');
+
     if (textVal.trim().length > 0) {
-      if (textInput.elementId) {
+      if (currentInput.elementId) {
         // Edit existing element
-        const el = elements.find((e) => e.id === textInput.elementId);
+        const el = elements.find((e) => e.id === currentInput.elementId);
         if (el) {
           const updated = {
             ...el,
@@ -847,8 +854,8 @@ export default function WhiteboardPage() {
         // Create new element
         const textNode = DrawingEngine.createText(
           textVal,
-          textInput.wx,
-          textInput.wy,
+          currentInput.wx,
+          currentInput.wy,
           strokeColor,
           textFontSize,
           selfProfile?.userId || 'unknown',
@@ -858,16 +865,14 @@ export default function WhiteboardPage() {
         SnapshotEngine.logEvent();
       }
     } else {
-      if (textInput.elementId) {
-        const el = elements.find((e) => e.id === textInput.elementId);
+      if (currentInput.elementId) {
+        const el = elements.find((e) => e.id === currentInput.elementId);
         if (el) {
           RealtimeEngine.commitElement('DELETE_ELEMENT', el);
           SnapshotEngine.logEvent();
         }
       }
     }
-    setTextInput(null);
-    setActiveTool('select');
   };
 
   // Seek timeline scrub release
@@ -2029,6 +2034,7 @@ export default function WhiteboardPage() {
               />
               <button 
                 onMouseDown={(e) => { e.preventDefault(); handleTextCommit(); }}
+                onTouchStart={(e) => { e.preventDefault(); handleTextCommit(); }}
                 className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition-all"
               >
                 Add
