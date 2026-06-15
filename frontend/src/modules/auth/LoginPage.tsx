@@ -19,8 +19,34 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
     
+    const emailOrUsername = email.trim();
+    if (emailOrUsername.includes('@')) {
+      const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      const ALLOWED_DOMAINS = [
+        'gmail.com',
+        'yahoo.com',
+        'outlook.com',
+        'hotmail.com',
+        'icloud.com',
+        'protonmail.com',
+        'proton.me',
+        'aol.com',
+        'zoho.com',
+        'gmx.com',
+        'yandex.com',
+        'mail.com',
+        'example.com'
+      ];
+      const parts = emailOrUsername.split('@');
+      if (!EMAIL_REGEX.test(emailOrUsername) || parts.length !== 2 || !ALLOWED_DOMAINS.includes(parts[1].toLowerCase())) {
+        setError('Please enter a valid email address with an allowed domain (e.g., @gmail.com).');
+        setIsLoading(false);
+        return;
+      }
+    }
+    
     try {
-      const response = await api.post('/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email: emailOrUsername, password });
       setAuth(response.data.user, response.data.token);
       navigate('/dashboard');
     } catch (err: any) {
@@ -52,15 +78,15 @@ export default function LoginPage() {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
-              Email
+              Email or Username
             </label>
             <input
               id="email"
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 focus:border-purple-500"
-              placeholder="name@example.com"
+              placeholder="name@example.com or username"
               required
             />
           </div>

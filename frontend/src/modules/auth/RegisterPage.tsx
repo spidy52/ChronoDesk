@@ -91,6 +91,37 @@ export default function RegisterPage() {
         return;
       }
 
+      /* ================= EMAIL VALIDATION ================= */
+
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      const allowedDomains = [
+        'gmail.com',
+        'yahoo.com',
+        'outlook.com',
+        'hotmail.com',
+        'icloud.com',
+        'protonmail.com',
+        'proton.me',
+        'aol.com',
+        'zoho.com',
+        'gmx.com',
+        'yandex.com',
+        'mail.com',
+        'example.com'
+      ];
+      const trimmedEmail = email.trim();
+      const emailParts = trimmedEmail.split('@');
+
+      if (!emailRegex.test(trimmedEmail) || emailParts.length !== 2 || !allowedDomains.includes(emailParts[1].toLowerCase())) {
+        setError(
+          'Please enter a valid email address with an allowed domain (e.g., user@gmail.com)'
+        );
+
+        setIsLoading(false);
+
+        return;
+      }
+
       try {
 
         const response =

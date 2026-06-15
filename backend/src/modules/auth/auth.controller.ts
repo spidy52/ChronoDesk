@@ -15,6 +15,32 @@ const JWT_SECRET =
   process.env.JWT_SECRET ||
   'super-secret-chrono-key-change-me';
 
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const ALLOWED_DOMAINS = [
+  'gmail.com',
+  'yahoo.com',
+  'outlook.com',
+  'hotmail.com',
+  'icloud.com',
+  'protonmail.com',
+  'proton.me',
+  'aol.com',
+  'zoho.com',
+  'gmx.com',
+  'yandex.com',
+  'mail.com',
+  'example.com'
+];
+
+const isValidEmail = (email: string): boolean => {
+  if (!email) return false;
+  const trimmed = email.trim();
+  if (!EMAIL_REGEX.test(trimmed)) return false;
+  const parts = trimmed.split('@');
+  if (parts.length !== 2) return false;
+  return ALLOWED_DOMAINS.includes(parts[1].toLowerCase());
+};
+
 /* ================= REGISTER ================= */
 
 export const register =
@@ -43,6 +69,12 @@ export const register =
         return res.status(400).json({
           error:
             'Email, username and password are required',
+        });
+      }
+
+      if (!isValidEmail(email)) {
+        return res.status(400).json({
+          error: 'Please enter a valid email address with an allowed domain (e.g., @gmail.com, @yahoo.com)',
         });
       }
 
@@ -217,6 +249,12 @@ export const login =
         });
       }
 
+      if (email.includes('@') && !isValidEmail(email)) {
+        return res.status(400).json({
+          error: 'Please enter a valid email address with an allowed domain',
+        });
+      }
+
       /* ================= FIND USER ================= */
 
       const user =
@@ -326,6 +364,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const { email } = req.body;
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: 'Please enter a valid email address with an allowed domain' });
     }
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
@@ -442,6 +483,9 @@ export const updateProfile = async (req: any, res: Response) => {
 
     // Check if email is being updated and is already taken
     if (email && email.toLowerCase() !== user.email) {
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ error: 'Please enter a valid email address with an allowed domain' });
+      }
       const existingEmail = await User.findOne({ email: email.toLowerCase() });
       if (existingEmail) {
         return res.status(400).json({ error: 'Email address already in use' });
