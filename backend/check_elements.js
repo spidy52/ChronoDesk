@@ -1,11 +1,12 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 
 async function run() {
   try {
-    const atlasUrl = 'mongodb+srv://itachi09061252_db_user:QoS36ZJyFAabzpc0@cluster0.8nyllrh.mongodb.net/chrono?retryWrites=true&w=majority&appName=Cluster0';
+    const databaseUrl = process.env.DATABASE_URL || 'mongodb://localhost:27017/chrono';
     
-    await mongoose.connect(atlasUrl);
-    console.log('Connected to Atlas DB');
+    await mongoose.connect(databaseUrl);
+    console.log('Connected to DB');
     
     const collections = await mongoose.connection.db.listCollections().toArray();
     console.log('Collections:', collections.map(c => c.name));

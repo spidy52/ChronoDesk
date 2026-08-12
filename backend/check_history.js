@@ -1,9 +1,10 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 
 async function run() {
   try {
-    const atlasUrl = 'mongodb+srv://itachi09061252_db_user:QoS36ZJyFAabzpc0@cluster0.8nyllrh.mongodb.net/chrono?retryWrites=true&w=majority&appName=Cluster0';
-    await mongoose.connect(atlasUrl);
+    const databaseUrl = process.env.DATABASE_URL || 'mongodb://localhost:27017/chrono';
+    await mongoose.connect(databaseUrl);
     
     const events = await mongoose.connection.db.collection('boardevents')
       .find({ 'data.id': 'b6088023-24c8-4e91-b1c4-e705879b58ac' })
