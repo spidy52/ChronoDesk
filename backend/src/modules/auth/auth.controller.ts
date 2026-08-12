@@ -378,19 +378,23 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetUrl = `${frontendBaseUrl}/reset-password/${token}`;
     
-    // Send email using Nodemailer utility
+    // Send email using Nodemailer utility (non-blocking, in background)
     const html = getResetPasswordHtml(resetUrl);
-    const { previewUrl } = await sendMail({
+    sendMail({
       to: user.email,
       subject: 'Reset Your ChronoDesk Password',
       html,
-    });
-    
-    console.log(`[PASSWORD RESET] Token generated for user ${user.email}: ${token}`);
-    console.log(`[PASSWORD RESET] Link: ${resetUrl}`);
-    if (previewUrl) {
-      console.log(`[PASSWORD RESET] Preview URL (Ethereal): ${previewUrl}`);
-    }
+    })
+      .then(({ previewUrl }) => {
+        console.log(`[PASSWORD RESET] Email sent successfully to ${user.email}`);
+        console.log(`[PASSWORD RESET] Link: ${resetUrl}`);
+        if (previewUrl) {
+          console.log(`[PASSWORD RESET] Preview URL (Ethereal): ${previewUrl}`);
+        }
+      })
+      .catch((err) => {
+        console.error(`[PASSWORD RESET] Failed to send email to ${user.email}:`, err);
+      });
 
     res.json({
       message: 'Password reset link sent successfully',

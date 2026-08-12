@@ -6,6 +6,8 @@ interface SendMailOptions {
   html: string;
 }
 
+let cachedTransporter: nodemailer.Transporter | null = null;
+
 export async function sendMail(options: SendMailOptions): Promise<{ previewUrl?: string; messageId: string }> {
   let transporter: nodemailer.Transporter;
   let previewUrl: string | undefined;
@@ -16,30 +18,35 @@ export async function sendMail(options: SendMailOptions): Promise<{ previewUrl?:
     process.env.SMTP_USER &&
     process.env.SMTP_PASS;
 
-  if (hasSmtpConfig) {
-    // 1. Production SMTP Configuration
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+  if (cachedTransporter) {
+    transporter = cachedTransporter;
   } else {
-    // 2. Development Ethereal SMTP Fallback (creates preview links automatically)
-    console.log('[MAILER] No SMTP configuration found in .env. Creating Ethereal test account...');
-    const testAccount = await nodemailer.createTestAccount();
-    transporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    });
+    if (hasSmtpConfig) {
+      // 1. Production SMTP Configuration
+      transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+    } else {
+      // 2. Development Ethereal SMTP Fallback (creates preview links automatically)
+      console.log('[MAILER] No SMTP configuration found in .env. Creating Ethereal test account...');
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+    }
+    cachedTransporter = transporter;
   }
 
   const mailOptions = {
