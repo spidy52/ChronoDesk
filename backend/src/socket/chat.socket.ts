@@ -68,7 +68,7 @@ export default function setupChatSocket(io: Server, socket: Socket) {
       );
 
       // 3. Update the last message read status if it was sent by someone else
-      if (chat.lastMessage && chat.lastMessage.senderId.toString() !== userId) {
+      if (chat.lastMessage && chat.lastMessage.senderId && chat.lastMessage.senderId.toString() !== userId) {
         chat.lastMessage.readAt = readAt;
       }
 
