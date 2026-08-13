@@ -7,6 +7,7 @@ import {
   Plus,
   ExternalLink,
   GripVertical,
+  X,
 } from 'lucide-react';
 
 import {
@@ -15,6 +16,7 @@ import {
 
 import { useNavigate } from 'react-router-dom';
 import { Draggable } from '@hello-pangea/dnd';
+import toast from 'react-hot-toast';
 
 
 import { useTaskStore } from '../../../store/useTaskStore';
@@ -46,6 +48,7 @@ interface Task {
   createdBy?: any;
 
   collaborators?: any[];
+  pendingCollaborators?: any[];
 }
 
 interface TaskCardProps {
@@ -110,6 +113,9 @@ export default function TaskCard({
         : ''
     );
 
+  const [localCollaborators, setLocalCollaborators] = useState<any[]>([]);
+  const [localPendingCollaborators, setLocalPendingCollaborators] = useState<any[]>([]);
+
   /* ================= PRIORITY COLORS ================= */
 
   const getPriorityClasses = (
@@ -157,6 +163,9 @@ export default function TaskCard({
 
         setLoading(true);
 
+        const collaboratorIds = localCollaborators.map((c) => c._id || c);
+        const pendingCollaboratorIds = localPendingCollaborators.map((c) => c._id || c);
+
         await updateTaskById(
           task._id,
           {
@@ -165,6 +174,10 @@ export default function TaskCard({
             description,
 
             dueDate,
+
+            collaborators: collaboratorIds,
+
+            pendingCollaborators: pendingCollaboratorIds,
           }
         );
 
@@ -378,28 +391,59 @@ export default function TaskCard({
 
             {editing ? (
 
-              <button
-                onClick={
-                  handleSave
-                }
-                disabled={loading}
-                className="
-                  w-8
-                  h-8
-                  rounded-full
-                  bg-green-500/10
-                  flex
-                  items-center
-                  justify-center
-                  text-green-500
-                  hover:scale-110
-                  transition-all
-                "
-              >
-                <Check
-                  size={16}
-                />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={
+                    handleSave
+                  }
+                  disabled={loading}
+                  className="
+                    w-8
+                    h-8
+                    rounded-full
+                    bg-green-500/10
+                    flex
+                    items-center
+                    justify-center
+                    text-green-500
+                    hover:scale-110
+                    transition-all
+                    cursor-pointer
+                  "
+                  title="Save Changes"
+                >
+                  <Check
+                    size={16}
+                  />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTitle(task.title);
+                    setDescription(task.description);
+                    setEditing(false);
+                  }}
+                  disabled={loading}
+                  className="
+                    w-8
+                    h-8
+                    rounded-full
+                    bg-red-500/10
+                    flex
+                    items-center
+                    justify-center
+                    text-red-500
+                    hover:scale-110
+                    transition-all
+                    cursor-pointer
+                  "
+                  title="Cancel Edit"
+                >
+                  <X
+                    size={16}
+                  />
+                </button>
+              </div>
 
             ) : (
 
@@ -426,11 +470,11 @@ export default function TaskCard({
                   <ExternalLink size={16} />
                 </button>
                 <button
-                  onClick={() =>
-                    setEditing(
-                      true
-                    )
-                  }
+                  onClick={() => {
+                    setLocalCollaborators(task.collaborators || []);
+                    setLocalPendingCollaborators(task.pendingCollaborators || []);
+                    setEditing(true);
+                  }}
                   className="
                     w-8
                     h-8
@@ -588,6 +632,53 @@ export default function TaskCard({
             {task.status}
           </span>
         </div>
+
+        {/* EDIT COLLABORATORS (Only when editing and isCreator) */}
+        {editing && isCreator && ((localCollaborators && localCollaborators.length > 0) || (localPendingCollaborators && localPendingCollaborators.length > 0)) && (
+          <div className="mb-4">
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
+              Remove Collaborators
+            </label>
+            <div className="bg-secondary/30 rounded-xl p-2 border border-border/40 space-y-1.5 max-h-[120px] overflow-y-auto custom-scrollbar">
+              {localCollaborators.map((collab: any) => (
+                <div key={collab._id} className="flex items-center justify-between bg-card border border-border/30 rounded-lg p-1.5">
+                  <span className="text-xs text-foreground font-semibold truncate max-w-[150px]">
+                    {collab.name}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLocalCollaborators((prev) => prev.filter((c) => (c._id || c) !== (collab._id || collab)));
+                      toast.success('Collaborator marked for removal');
+                    }}
+                    className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors shrink-0 cursor-pointer border border-transparent hover:border-red-500/20"
+                    title="Remove Collaborator"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+              {localPendingCollaborators.map((collab: any) => (
+                <div key={collab._id} className="flex items-center justify-between bg-card border border-border/30 rounded-lg p-1.5 opacity-80">
+                  <span className="text-xs text-foreground font-semibold truncate max-w-[150px]">
+                    {collab.name} <span className="text-[10px] text-amber-500 font-normal">(Pending)</span>
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLocalPendingCollaborators((prev) => prev.filter((c) => (c._id || c) !== (collab._id || collab)));
+                      toast.success('Collaborator invitation marked for cancellation');
+                    }}
+                    className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors shrink-0 cursor-pointer border border-transparent hover:border-red-500/20"
+                    title="Cancel Invitation"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* FOOTER */}
 

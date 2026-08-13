@@ -3,6 +3,7 @@ import express from 'express';
 import {
   sendInvitation,
   getInvitations,
+  getSentInvitations,
   acceptInvitation,
   rejectInvitation,
   getMembers,
@@ -27,6 +28,12 @@ router.get(
   '/invitations',
   protect,
   getInvitations
+);
+
+router.get(
+  '/sent-invitations',
+  protect,
+  getSentInvitations
 );
 
 router.patch(

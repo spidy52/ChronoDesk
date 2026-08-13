@@ -193,17 +193,13 @@ export const register =
         token,
 
         user: {
-
           id: user.id,
-
-          email:
-            user.email,
-
-          name:
-            user.name,
-
-          username:
-            user.username,
+          email: user.email,
+          name: user.name,
+          username: user.username,
+          avatar: user.avatar,
+          bio: user.bio,
+          createdAt: (user as any).createdAt,
         },
       });
 
@@ -322,24 +318,16 @@ export const login =
       /* ================= RESPONSE ================= */
 
       res.json({
-
-        message:
-          'Login successful',
-
+        message: 'Login successful',
         token,
-
         user: {
-
           id: user.id,
-
-          email:
-            user.email,
-
-          name:
-            user.name,
-
-          username:
-            user.username,
+          email: user.email,
+          name: user.name,
+          username: user.username,
+          avatar: user.avatar,
+          bio: user.bio,
+          createdAt: (user as any).createdAt,
         },
       });
 
@@ -568,6 +556,30 @@ export const searchUsers = async (req: any, res: Response) => {
     res.json(users);
   } catch (error) {
     console.error('SearchUsers error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/* ================= GET PROFILE ================= */
+export const getProfile = async (req: any, res: Response) => {
+  try {
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        username: user.username,
+        avatar: user.avatar,
+        bio: user.bio,
+        createdAt: user.createdAt,
+      }
+    });
+  } catch (error) {
+    console.error('GetProfile error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -14,6 +14,8 @@ import {
   Mail,
   X,
   Trash2,
+  Code,
+  Palette,
 } from 'lucide-react';
 
 import { socket } from '../../../services/socket';
@@ -29,6 +31,8 @@ interface Member {
   role: string;
   status: string;
   avatar?: string;
+  bio?: string;
+  joinedAt?: string;
 }
 
 export default function MembersPage() {
@@ -44,11 +48,37 @@ export default function MembersPage() {
   const [inviteModal, setInviteModal] =
     useState(false);
 
+  const [profileUser, setProfileUser] =
+    useState<Member | null>(null);
+
+  const [sentRequests, setSentRequests] =
+    useState<any[]>([]);
+
   const [inviteData, setInviteData] =
     useState({
       username: '',
       role: 'Member',
     });
+
+  const fetchSentRequests = async () => {
+    try {
+      const response = await api.get('/members/sent-invitations');
+      setSentRequests(response.data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const cancelInvitation = async (id: string) => {
+    try {
+      await api.delete(`/members/${id}`);
+      toast.success('Invitation cancelled successfully');
+      fetchSentRequests();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to cancel invitation');
+    }
+  };
 
   // Search users states inside invite modal
   const [userQuery, setUserQuery] = useState('');
@@ -79,6 +109,7 @@ export default function MembersPage() {
 
   useEffect(() => {
     fetchMembers();
+    fetchSentRequests();
   }, []);
 
   const fetchMembers =
@@ -158,6 +189,7 @@ export default function MembersPage() {
         );
 
         setInviteModal(false);
+        fetchSentRequests();
 
         setInviteData({
           username: '',
@@ -334,9 +366,60 @@ export default function MembersPage() {
                   onRemove={
                     removeMember
                   }
+                  onViewProfile={setProfileUser}
                 />
               )
             )}
+          </div>
+        )}
+
+        {/* PENDING SENT INVITATIONS SECTION */}
+        {sentRequests.length > 0 && (
+          <div className="mt-12 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="border-t border-border/40 pt-8">
+              <h3 className="text-lg font-bold mb-6 flex items-center gap-2 text-foreground">
+                Pending Sent Requests
+                <span className="bg-primary/10 text-primary text-xs px-2.5 py-0.5 rounded-full font-bold">
+                  {sentRequests.length}
+                </span>
+              </h3>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {sentRequests.map((req) => (
+                  <div key={req._id} className="bg-card border rounded-3xl p-5 hover:shadow-lg transition-all flex items-center justify-between">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-semibold overflow-hidden shrink-0">
+                        {req.toUser?.avatar ? (
+                          <img 
+                            src={req.toUser.avatar.startsWith('/uploads') ? `${BACKEND_URL}${req.toUser.avatar}` : req.toUser.avatar} 
+                            alt="avatar" 
+                            className="w-full h-full object-cover" 
+                          />
+                        ) : (
+                          req.toUser?.name?.charAt(0) || 'U'
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-base text-foreground truncate">{req.toUser?.name}</h4>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <RoleIcon role={req.role} size={12} />
+                          <span className="text-xs text-muted-foreground truncate">
+                            @{req.toUser?.username} • {req.role}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => cancelInvitation(req._id)}
+                      className="px-4 py-2 text-xs font-semibold rounded-xl border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-all shrink-0"
+                    >
+                      Cancel Request
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -532,6 +615,94 @@ export default function MembersPage() {
             </div>
           </div>
         )}
+
+        {/* MEMBER PROFILE FLOATING CARD MODAL */}
+        {profileUser && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-300">
+            <div 
+              className="fixed inset-0 bg-transparent" 
+              onClick={() => setProfileUser(null)} 
+            />
+            <div className="w-full max-w-sm bg-card border border-border/85 rounded-3xl p-6 shadow-2xl flex flex-col relative z-10 animate-in zoom-in-95 duration-200">
+              {/* CLOSE BUTTON TOP RIGHT */}
+              <button
+                onClick={() => setProfileUser(null)}
+                className="absolute right-5 top-5 text-muted-foreground hover:text-foreground transition-all"
+              >
+                <X size={18} />
+              </button>
+
+              {/* CARD HEADER / BODY */}
+              <div className="flex flex-col items-center text-center mt-4">
+                {/* Avatar */}
+                <div className="w-24 h-24 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-3xl shadow-inner overflow-hidden mb-4">
+                  {profileUser.avatar ? (
+                    <img 
+                      src={profileUser.avatar.startsWith('/uploads') ? `${BACKEND_URL}${profileUser.avatar}` : profileUser.avatar} 
+                      alt="avatar" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    profileUser.name?.charAt(0) || 'U'
+                  )}
+                </div>
+
+                {/* Name & Username */}
+                <h3 className="font-bold text-xl text-foreground mb-1">{profileUser.name}</h3>
+                <span className="text-sm text-primary font-semibold mb-3">@{profileUser.username}</span>
+                
+                {/* Email */}
+                <span className="text-xs text-muted-foreground font-mono bg-secondary/80 px-3.5 py-1 rounded-full border border-border/30 mb-5">
+                  {profileUser.email}
+                </span>
+
+                {/* Info List */}
+                <div className="w-full space-y-4 border-t border-border/50 pt-4 text-left">
+                  {/* Status */}
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Status:</span>
+                    <span className={`px-2 py-0.5 rounded-md font-semibold ${
+                      profileUser.status === 'Online'
+                        ? 'bg-green-500/10 text-green-500'
+                        : profileUser.status === 'Busy'
+                        ? 'bg-red-500/10 text-red-500'
+                        : 'bg-gray-500/10 text-gray-500'
+                    }`}>
+                      {profileUser.status}
+                    </span>
+                  </div>
+
+                  {/* Role */}
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Workspace Role:</span>
+                    <span className="font-semibold text-foreground flex items-center gap-1.5">
+                      <RoleIcon role={profileUser.role} size={14} />
+                      {profileUser.role}
+                    </span>
+                  </div>
+
+                  {/* Joined At */}
+                  {profileUser.joinedAt && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground">Joined Members:</span>
+                      <span className="font-semibold text-foreground font-mono">
+                        {new Date(profileUser.joinedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Bio */}
+                  <div className="border-t border-border/30 pt-3">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground block font-bold mb-1">Bio</span>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {profileUser.bio || 'No bio provided.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
@@ -573,10 +744,12 @@ function StatCard({
 function MemberCard({
   member,
   onRemove,
+  onViewProfile,
 }: {
   member: Member;
 
   onRemove: (id: string) => void;
+  onViewProfile: (member: Member) => void;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -712,7 +885,10 @@ function MemberCard({
           {member.status}
         </span>
 
-        <button className="px-5 py-2 rounded-2xl bg-primary text-primary-foreground hover:opacity-90 transition-all">
+        <button 
+          onClick={() => onViewProfile(member)}
+          className="px-5 py-2 rounded-2xl bg-primary text-primary-foreground hover:opacity-90 transition-all"
+        >
           View Profile
         </button>
       </div>
@@ -722,34 +898,52 @@ function MemberCard({
 
 function RoleIcon({
   role,
+  size = 16,
 }: {
   role: string;
+  size?: number;
 }) {
 
   if (role === 'Admin') {
-
     return (
       <Crown
-        size={16}
+        size={size}
         className="text-yellow-500"
       />
     );
   }
 
   if (role === 'Manager') {
-
     return (
       <Shield
-        size={16}
+        size={size}
         className="text-blue-500"
+      />
+    );
+  }
+
+  if (role === 'Developer') {
+    return (
+      <Code
+        size={size}
+        className="text-emerald-500"
+      />
+    );
+  }
+
+  if (role === 'Designer') {
+    return (
+      <Palette
+        size={size}
+        className="text-pink-500"
       />
     );
   }
 
   return (
     <User
-      size={16}
-      className="text-primary"
+      size={size}
+      className="text-muted-foreground"
     />
   );
 }

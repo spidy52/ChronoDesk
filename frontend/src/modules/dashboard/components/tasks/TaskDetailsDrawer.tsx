@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Calendar, Flag, Trash2, Check } from 'lucide-react';
 import { useTaskStore } from '../../../../store/useTaskStore';
+import { useAuthStore } from '../../../../modules/auth/store';
 import toast from 'react-hot-toast';
 
 interface TaskDetailsDrawerProps {
@@ -14,7 +15,9 @@ export default function TaskDetailsDrawer({
   onClose,
   task,
 }: TaskDetailsDrawerProps) {
-  const { updateTaskById, deleteTaskById } = useTaskStore();
+  const { updateTaskById, deleteTaskById, removeCollaboratorFromTask } = useTaskStore();
+  const { user } = useAuthStore();
+  const isCreator = user && (task?.createdBy?._id || task?.createdBy) === (user.id || user._id);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -70,6 +73,16 @@ export default function TaskDetailsDrawer({
     } finally {
       setLoading(false);
       setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleRemoveCollaborator = async (userId: string) => {
+    try {
+      await removeCollaboratorFromTask(task._id, userId);
+      toast.success('Collaborator removed successfully');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to remove collaborator');
     }
   };
 
@@ -174,6 +187,81 @@ export default function TaskDetailsDrawer({
               className="w-full bg-secondary border border-border rounded-xl px-4 py-3 outline-none focus:border-primary transition-colors"
             />
           </div>
+
+          {/* Collaborators Management */}
+          {((task.collaborators && task.collaborators.length > 0) || 
+            (task.pendingCollaborators && task.pendingCollaborators.length > 0)) && (
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Task Collaborators
+              </label>
+              <div className="bg-secondary/40 border border-border rounded-xl p-4 space-y-3">
+                {/* Active Collaborators */}
+                {task.collaborators?.map((collab: any) => (
+                  <div key={collab._id} className="flex items-center justify-between bg-card border border-border/50 rounded-xl p-2.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs overflow-hidden shrink-0">
+                        {collab.avatar ? (
+                          <img src={collab.avatar} alt="avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          collab.name?.charAt(0) || 'U'
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-sm font-semibold text-foreground block truncate">{collab.name}</span>
+                        <span className="text-[10px] text-muted-foreground block truncate">@{collab.username}</span>
+                      </div>
+                    </div>
+                    {isCreator ? (
+                      <button
+                        onClick={() => handleRemoveCollaborator(collab._id)}
+                        className="w-8 h-8 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-all cursor-pointer border border-transparent hover:border-red-500/20"
+                        title="Remove Collaborator"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded bg-green-500/10 text-green-500 text-[10px] font-semibold border border-green-500/20">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                ))}
+
+                {/* Pending Collaborators */}
+                {task.pendingCollaborators?.map((collab: any) => (
+                  <div key={collab._id} className="flex items-center justify-between bg-card border border-border/50 rounded-xl p-2.5 opacity-80">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs overflow-hidden shrink-0">
+                        {collab.avatar ? (
+                          <img src={collab.avatar} alt="avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          collab.name?.charAt(0) || 'U'
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-sm font-semibold text-foreground block truncate">{collab.name}</span>
+                        <span className="text-[10px] text-muted-foreground block truncate">@{collab.username}</span>
+                      </div>
+                    </div>
+                    {isCreator ? (
+                      <button
+                        onClick={() => handleRemoveCollaborator(collab._id)}
+                        className="w-8 h-8 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-all cursor-pointer border border-transparent hover:border-red-500/20"
+                        title="Cancel Invitation"
+                      >
+                        <X size={14} />
+                      </button>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 text-[10px] font-semibold border border-amber-500/20">
+                        Pending
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

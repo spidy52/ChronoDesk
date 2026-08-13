@@ -8,6 +8,7 @@ import {
   changePassword,
   updateProfile,
   searchUsers,
+  getProfile,
 } from './auth.controller';
 
 import { protect } from '../../middleware/auth.middleware';
@@ -25,6 +26,7 @@ router.post('/reset-password', resetPassword);
 router.post('/change-password', protect, changePassword as any);
 
 router.put('/profile', protect, updateProfile as any);
+router.get('/profile', protect, getProfile as any);
 
 router.get('/search-users', protect, searchUsers as any);
 

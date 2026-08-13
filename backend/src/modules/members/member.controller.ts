@@ -305,12 +305,12 @@ export const getMembers =
 
           .populate(
             'fromUser',
-            'name username email isOnline'
+            'name username email isOnline avatar bio'
           )
 
           .populate(
             'toUser',
-            'name username email isOnline'
+            'name username email isOnline avatar bio'
           );
 
       const formattedMembers = members.map((member: any) => {
@@ -327,6 +327,9 @@ export const getMembers =
           email: otherUser.email,
           role: member.role,
           status: otherUser.isOnline ? 'Online' : 'Offline',
+          avatar: otherUser.avatar,
+          bio: otherUser.bio,
+          joinedAt: member.createdAt,
         };
       });
 
@@ -369,6 +372,28 @@ export const removeMember = async (req: any, res: Response) => {
     // Emit to both so they can update their UI
     io.to(member.fromUser.toString()).emit('member:removed', req.params.id);
     io.to(member.toUser.toString()).emit('member:removed', req.params.id);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/* ================= GET SENT INVITATIONS ================= */
+export const getSentInvitations = async (req: any, res: Response) => {
+  try {
+    const invitations = await Members.find({
+      fromUser: req.user.userId,
+      status: 'pending',
+    }).populate('toUser', 'name username email avatar bio');
+
+    const formatted = invitations.map((inv: any) => ({
+      _id: inv._id.toString(),
+      toUser: inv.toUser,
+      role: inv.role,
+      createdAt: inv.createdAt,
+    }));
+
+    res.json(formatted);
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: 'Internal server error' });

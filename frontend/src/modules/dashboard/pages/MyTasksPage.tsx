@@ -14,11 +14,12 @@ import {
 } from 'lucide-react';
 
 import { useTaskStore } from '../../../store/useTaskStore';
+import { useWorkspaceStore } from '../../../store/workspaceStore';
 
 /* ================= PAGE ================= */
 
 export default function MyTasksPage() {
-
+  const { activeWorkspace } = useWorkspaceStore();
   const {
     tasks,
     fetchAllTasks,
@@ -53,6 +54,8 @@ export default function MyTasksPage() {
         status: 'todo',
 
         priority: 'medium',
+
+        workspaceId: activeWorkspace?._id || 'default',
       });
 
       await fetchAllTasks();

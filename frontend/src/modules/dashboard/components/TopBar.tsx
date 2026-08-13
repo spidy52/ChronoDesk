@@ -22,9 +22,13 @@ import {
 } from 'react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 
 import { useAuthStore } from '../../auth/store';
 import { api } from '../../../lib/axios';
+import { useWorkspaceStore } from '../../../store/workspaceStore';
+import { useChatStore } from '../store/useChatStore';
+import { useTaskStore } from '../../../store/useTaskStore';
 
 interface Invitation {
   _id: string;
@@ -78,8 +82,18 @@ export default function TopBar({
   >;
 }) {
 
-  const { user, logout } =
+  const { user, logout, updateUser } =
     useAuthStore();
+  const workspaces = useWorkspaceStore((state: any) => state.workspaces);
+  const chats = useChatStore((state: any) => state.chats);
+  const tasks = useTaskStore((state: any) => state.tasks);
+
+  const myTasks = tasks.filter((t: any) => {
+    const assigneeId = t.assignee?._id || t.assignee;
+    const currentUserId = user?.id || user?._id;
+    return assigneeId && currentUserId && assigneeId.toString() === currentUserId.toString();
+  });
+  const completedTasksCount = myTasks.filter((t: any) => t.status?.toLowerCase() === 'completed').length;
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,7 +107,9 @@ export default function TopBar({
       case '/calendar': return 'Calendar';
       case '/members': return 'Members';
       case '/chats': return 'Chats';
-      default: return 'Tasks Board';
+      case '/whiteboard': return 'Whiteboard';
+      case '/settings': return 'Settings';
+      default: return 'ChronoDesk';
     }
   };
 
@@ -106,6 +122,34 @@ export default function TopBar({
     | 'filters'
     | null
   >(null);
+
+  const [myProfileOpen, setMyProfileOpen] = useState(false);
+
+  // Sync profile details and store counts in real-time when the modal opens
+  useEffect(() => {
+    if (myProfileOpen) {
+      // Sync profile fields from backend (avatar, bio, createdAt)
+      api.get('/auth/profile')
+        .then((res) => {
+          if (res.data?.user) {
+            updateUser(res.data.user);
+          }
+        })
+        .catch((err) => console.error('Failed to sync profile:', err));
+
+      // Refresh chats count
+      const chatStore = useChatStore.getState();
+      if (chatStore.fetchChats) {
+        chatStore.fetchChats();
+      }
+
+      // Refresh tasks count
+      const taskStore = useTaskStore.getState();
+      if (taskStore.fetchAllTasks) {
+        taskStore.fetchAllTasks();
+      }
+    }
+  }, [myProfileOpen, updateUser]);
 
   const [
     invitations,
@@ -178,6 +222,10 @@ export default function TopBar({
       try {
         if (invite.type === 'task') {
           await api.post(`/tasks/invitations/${id}/accept`);
+          const fetchAllTasks = useTaskStore.getState().fetchAllTasks;
+          if (fetchAllTasks) {
+            fetchAllTasks();
+          }
         } else {
           await api.patch(
             `/members/accept/${id}`
@@ -473,6 +521,10 @@ export default function TopBar({
                   />
                 }
                 label="Profile"
+                onClick={() => {
+                  setMyProfileOpen(true);
+                  setActiveDropdown(null);
+                }}
               />
 
               <ProfileButton
@@ -632,6 +684,149 @@ export default function TopBar({
             }
           />
         </div>
+        )}
+
+        {/* PERSONAL PROFILE SUMMARY MODAL */}
+        {myProfileOpen && user && createPortal(
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-300">
+            <div 
+              className="fixed inset-0 bg-transparent" 
+              onClick={() => setMyProfileOpen(false)} 
+            />
+            <div className="w-full max-w-md bg-card border border-border/85 rounded-3xl shadow-2xl flex flex-col relative z-10 max-h-[90vh] overflow-y-auto scrollbar-hide animate-in zoom-in-95 duration-200">
+              {/* TOP BANNER */}
+              <div className="h-28 bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/20 relative border-b border-border/10 shrink-0">
+                {/* CLOSE BUTTON */}
+                <button
+                  onClick={() => setMyProfileOpen(false)}
+                  className="absolute right-5 top-5 w-8 h-8 rounded-full bg-background/60 hover:bg-background/80 border border-border/30 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all z-20 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* PROFILE CONTENT CONTAINER */}
+              <div className="px-6 pb-6 pt-0 flex flex-col items-center relative">
+                {/* Avatar */}
+                <div className="w-24 h-24 rounded-3xl bg-primary/20 border-4 border-card flex items-center justify-center text-primary font-bold text-3xl shadow-xl overflow-hidden -mt-12 mb-3 relative z-10 bg-card">
+                  {user.avatar ? (
+                    <img 
+                      src={user.avatar.startsWith('/uploads') ? `${api.defaults.baseURL?.replace('/api', '') || ''}${user.avatar}` : user.avatar} 
+                      alt="avatar" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    user.name?.charAt(0) || 'U'
+                  )}
+                </div>
+
+                {/* Name & Username */}
+                <h3 className="font-bold text-xl text-foreground tracking-tight">{user.name}</h3>
+                <span className="text-xs text-muted-foreground bg-secondary px-3 py-1 rounded-full font-medium border border-border/40 mt-1.5 mb-1">
+                  @{user.username}
+                </span>
+
+                {/* Joined Date */}
+                {user.createdAt && (
+                  <span className="text-[10px] text-muted-foreground mb-4">
+                    Member since {new Date(user.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </span>
+                )}
+
+                {/* Biography Callout */}
+                <div className="w-full bg-secondary/10 border border-border/20 rounded-2xl p-4 mb-4 text-center">
+                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-bold block mb-1">About Me</span>
+                  <p className="text-xs text-muted-foreground leading-relaxed italic">
+                    "{user.bio || "No biography provided yet. Go to settings to write one!"}"
+                  </p>
+                </div>
+
+                {/* Account Info Cards */}
+                <div className="w-full space-y-3">
+                  {/* Email Info Card */}
+                  <div className="bg-secondary/20 border border-border/30 rounded-2xl p-4 flex items-center gap-3.5">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                      <Mail size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">Email Address</span>
+                      <span className="text-sm font-medium text-foreground block truncate">{user.email}</span>
+                    </div>
+                  </div>
+
+                  {/* Status Info Card */}
+                  <div className="bg-secondary/20 border border-border/30 rounded-2xl p-4 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 shrink-0">
+                        <User size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">Account Status</span>
+                        <span className="text-sm font-medium text-foreground block truncate">Active Member</span>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-500 font-semibold text-[10px] flex items-center gap-1.5 border border-green-500/20 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Online
+                    </span>
+                  </div>
+                </div>
+
+                {/* Metric Cards Grid */}
+                <div className="w-full grid grid-cols-2 gap-4 mt-6">
+                  {/* Workspaces Metric Card */}
+                  <div className="bg-secondary/25 border border-border/30 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-secondary/40 transition-all group text-center">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform mb-2">
+                      <LayoutGrid size={16} />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Workspaces</span>
+                    <h4 className="text-xl font-bold text-foreground mt-1">{workspaces.length + 1}</h4>
+                  </div>
+
+                  {/* Chats Metric Card */}
+                  <div className="bg-secondary/25 border border-border/30 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-secondary/40 transition-all group text-center">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform mb-2">
+                      <Mail size={16} />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Conversations</span>
+                    <h4 className="text-xl font-bold text-foreground mt-1">{chats.length}</h4>
+                  </div>
+
+                  {/* Tasks Metric Card */}
+                  <div className="bg-secondary/25 border border-border/30 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-secondary/40 transition-all group text-center">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform mb-2">
+                      <List size={16} />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tasks Assigned</span>
+                    <h4 className="text-xl font-bold text-foreground mt-1">{myTasks.length}</h4>
+                  </div>
+
+                  {/* Done Metric Card */}
+                  <div className="bg-secondary/25 border border-border/30 rounded-2xl p-4 flex flex-col items-center justify-center hover:bg-secondary/40 transition-all group text-center">
+                    <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform mb-2">
+                      <Check size={16} />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tasks Completed</span>
+                    <h4 className="text-xl font-bold text-foreground mt-1">{completedTasksCount}</h4>
+                  </div>
+                </div>
+
+                {/* Action Footer */}
+                <div className="w-full mt-6 pt-5 border-t border-border/30">
+                  <button
+                    onClick={() => {
+                      setMyProfileOpen(false);
+                      navigate('/settings');
+                    }}
+                    className="w-full py-3 rounded-2xl bg-primary text-primary-foreground hover:opacity-90 text-sm font-semibold transition-all active:scale-[0.98] shadow-lg shadow-primary/10 cursor-pointer text-center"
+                  >
+                    Edit Profile
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

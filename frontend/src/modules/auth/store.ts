@@ -8,6 +8,8 @@ interface User {
   username?: string;
   isOnline?: boolean;
   avatar?: string;
+  bio?: string;
+  createdAt?: string;
 }
 
 interface AuthState {

@@ -1,8 +1,10 @@
 import { Response } from 'express';
 import { io } from '../../index';
+import mongoose from 'mongoose';
 
 import Task from '../../models/Task';
 import Members from '../../models/Member';
+import Workspace from '../../models/Workspace';
 
 import {
   AuthRequest,
@@ -26,12 +28,35 @@ export const createTask =
 
       // Populate for socket event
       const populatedTask = await Task.findById(task._id)
+        .populate('assignee', 'name email username avatar')
         .populate('collaborators', 'name email username avatar')
         .populate('pendingCollaborators', 'name email username avatar')
         .populate('createdBy', 'name email username avatar');
 
-      if (req.user?.userId) {
-        io.to(req.user.userId).emit('task:created', populatedTask);
+      if (populatedTask) {
+        const userIdsToNotify = new Set<string>();
+        
+        userIdsToNotify.add(populatedTask.createdBy._id.toString());
+        if (populatedTask.assignee) {
+          const assigneeId = populatedTask.assignee._id || populatedTask.assignee;
+          userIdsToNotify.add(assigneeId.toString());
+        }
+        populatedTask.collaborators?.forEach((c: any) => {
+          const collabId = c._id || c;
+          userIdsToNotify.add(collabId.toString());
+        });
+
+        if (mongoose.Types.ObjectId.isValid(populatedTask.workspaceId)) {
+          const workspace = await Workspace.findById(populatedTask.workspaceId);
+          if (workspace) {
+            userIdsToNotify.add(workspace.owner.toString());
+            workspace.members?.forEach((m: any) => userIdsToNotify.add(m.toString()));
+          }
+        }
+
+        userIdsToNotify.forEach((userId) => {
+          io.to(userId).emit('task:created', populatedTask);
+        });
       }
 
       res.status(201).json({
@@ -63,9 +88,11 @@ export const getTasks =
         await Task.find({
           $or: [
             { createdBy: req.user?.userId },
-            { collaborators: req.user?.userId }
+            { collaborators: req.user?.userId },
+            { assignee: req.user?.userId }
           ]
         })
+        .populate('assignee', 'name email username avatar')
         .populate('collaborators', 'name email username avatar')
         .populate('pendingCollaborators', 'name email username avatar')
         .populate('createdBy', 'name email username avatar')
@@ -115,16 +142,34 @@ export const updateTask =
             new: true,
           }
         )
+        .populate('assignee', 'name email username avatar')
         .populate('collaborators', 'name email username avatar')
         .populate('pendingCollaborators', 'name email username avatar')
         .populate('createdBy', 'name email username avatar');
 
       if (updatedTask) {
-        // Emit to creator
-        io.to(updatedTask.createdBy._id.toString()).emit('task:updated', updatedTask);
-        // Emit to all collaborators
-        updatedTask.collaborators.forEach((collab: any) => {
-          io.to(collab._id.toString()).emit('task:updated', updatedTask);
+        const userIdsToNotify = new Set<string>();
+        
+        userIdsToNotify.add(updatedTask.createdBy._id.toString());
+        if (updatedTask.assignee) {
+          const assigneeId = updatedTask.assignee._id || updatedTask.assignee;
+          userIdsToNotify.add(assigneeId.toString());
+        }
+        updatedTask.collaborators?.forEach((c: any) => {
+          const collabId = c._id || c;
+          userIdsToNotify.add(collabId.toString());
+        });
+
+        if (mongoose.Types.ObjectId.isValid(updatedTask.workspaceId)) {
+          const workspace = await Workspace.findById(updatedTask.workspaceId);
+          if (workspace) {
+            userIdsToNotify.add(workspace.owner.toString());
+            workspace.members?.forEach((m: any) => userIdsToNotify.add(m.toString()));
+          }
+        }
+
+        userIdsToNotify.forEach((userId) => {
+          io.to(userId).emit('task:updated', updatedTask);
         });
       }
 
@@ -161,9 +206,26 @@ export const deleteTask =
       });
 
       if (deletedTask) {
-        io.to(req.user!.userId).emit('task:deleted', deletedTask._id);
+        const userIdsToNotify = new Set<string>();
+        
+        userIdsToNotify.add(deletedTask.createdBy.toString());
+        if (deletedTask.assignee) {
+          userIdsToNotify.add(deletedTask.assignee.toString());
+        }
         deletedTask.collaborators?.forEach((collabId: any) => {
-          io.to(collabId.toString()).emit('task:deleted', deletedTask._id);
+          userIdsToNotify.add(collabId.toString());
+        });
+
+        if (mongoose.Types.ObjectId.isValid(deletedTask.workspaceId)) {
+          const workspace = await Workspace.findById(deletedTask.workspaceId);
+          if (workspace) {
+            userIdsToNotify.add(workspace.owner.toString());
+            workspace.members?.forEach((m: any) => userIdsToNotify.add(m.toString()));
+          }
+        }
+
+        userIdsToNotify.forEach((userId) => {
+          io.to(userId).emit('task:deleted', deletedTask._id);
         });
       }
 
