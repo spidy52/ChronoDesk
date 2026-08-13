@@ -8,10 +8,13 @@ interface MessageBubbleProps {
   isMe: boolean;
   readAt: string | null;
   deliveredAt: string | null;
+  showTime?: boolean;
 }
 
 const MessageBubble = memo(
-  ({ content, createdAt, isMe, readAt, deliveredAt }: MessageBubbleProps) => {
+  ({ content, createdAt, isMe, readAt, deliveredAt, showTime = true }: MessageBubbleProps) => {
+    const hasFooter = showTime || isMe;
+
     return (
       <div className={`flex w-full mb-2 group ${isMe ? "justify-end" : "justify-start"}`}>
         <div
@@ -25,22 +28,26 @@ const MessageBubble = memo(
             {content}
           </p>
           
-          <div className={`flex items-center gap-1.5 mt-1.5 ${isMe ? "justify-end text-primary-foreground/70" : "justify-start text-muted-foreground"}`}>
-            <span className="text-[10px] font-medium tracking-wide">
-              {formatMessageTime(createdAt)}
-            </span>
-            {isMe && (
-              <span className="flex items-center">
-                {readAt ? (
-                  <CheckCheck size={14} className="text-blue-300" />
-                ) : deliveredAt ? (
-                  <CheckCheck size={14} />
-                ) : (
-                  <Check size={14} />
-                )}
-              </span>
-            )}
-          </div>
+          {hasFooter && (
+            <div className={`flex items-center gap-1.5 mt-1.5 ${isMe ? "justify-end text-primary-foreground/70" : "justify-start text-muted-foreground"}`}>
+              {showTime && (
+                <span className="text-[10px] font-medium tracking-wide">
+                  {formatMessageTime(createdAt)}
+                </span>
+              )}
+              {isMe && (
+                <span className="flex items-center">
+                  {readAt ? (
+                    <CheckCheck size={14} className="text-blue-300" />
+                  ) : deliveredAt ? (
+                    <CheckCheck size={14} />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

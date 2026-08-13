@@ -140,10 +140,14 @@ export const useChatStore =
 
       setCurrentChat: (
         chat
-      ) =>
+      ) => {
         set({
           currentChat: chat,
-        }),
+        });
+        if (chat) {
+          get().markAsRead(chat._id, '');
+        }
+      },
 
       /* ================= FETCH CHATS ================= */
 
@@ -238,6 +242,8 @@ export const useChatStore =
                   sorted,
               },
             }));
+
+            get().markAsRead(chatId, '');
           } catch (error) {
             console.error(error);
 
@@ -518,6 +524,12 @@ export const useChatStore =
           (
             message: Message
           ) => {
+            // If we are actively viewing this chat, mark it as read immediately
+            const isCurrentActive = get().currentChat?._id === message.chatId;
+            if (isCurrentActive) {
+              socket.emit('chat:read', { chatId: message.chatId });
+            }
+
             set(
               (state) => {
                 const chatMessages = state.messages[message.chatId] || [];
@@ -534,10 +546,10 @@ export const useChatStore =
                         content: message.content,
                         senderId: message.senderId,
                         createdAt: message.createdAt,
-                        readAt: message.readAt,
+                        readAt: isCurrent ? new Date().toISOString() : message.readAt,
                         deliveredAt: message.deliveredAt,
                       },
-                      unreadCount: (isCurrent || isFromMe) ? (chat.unreadCount || 0) : (chat.unreadCount || 0) + 1,
+                      unreadCount: (isCurrent || isFromMe) ? 0 : (chat.unreadCount || 0) + 1,
                     };
                   }
                   return chat;
@@ -562,7 +574,7 @@ export const useChatStore =
                           content: message.content,
                           senderId: message.senderId,
                           createdAt: message.createdAt,
-                          readAt: message.readAt,
+                          readAt: isCurrentActive ? new Date().toISOString() : message.readAt,
                           deliveredAt: message.deliveredAt,
                         },
                       }
@@ -572,6 +584,54 @@ export const useChatStore =
             );
           }
         );
+
+        socket.on('chat:read', ({ chatId, readAt }: { chatId: string; readAt: string }) => {
+          set((state) => {
+            const chatMessages = state.messages[chatId] || [];
+            const currentUserId = useAuthStore.getState().user?.id || useAuthStore.getState().user?._id;
+            const updatedMessages = chatMessages.map((msg) => {
+              if (currentUserId && msg.senderId.toString() === currentUserId.toString() && !msg.readAt) {
+                return { ...msg, readAt };
+              }
+              return msg;
+            });
+
+            const updatedChats = state.chats.map((chat) => {
+              if (chat._id === chatId) {
+                return {
+                  ...chat,
+                  lastMessage: chat.lastMessage
+                    ? {
+                        ...chat.lastMessage,
+                        readAt: chat.lastMessage.senderId.toString() === currentUserId?.toString() ? readAt : chat.lastMessage.readAt,
+                      }
+                    : chat.lastMessage,
+                };
+              }
+              return chat;
+            });
+
+            const isCurrent = state.currentChat?._id === chatId;
+            return {
+              messages: {
+                ...state.messages,
+                [chatId]: updatedMessages,
+              },
+              chats: updatedChats,
+              currentChat: isCurrent && state.currentChat
+                ? {
+                    ...state.currentChat,
+                    lastMessage: state.currentChat.lastMessage
+                      ? {
+                          ...state.currentChat.lastMessage,
+                          readAt: state.currentChat.lastMessage.senderId.toString() === currentUserId?.toString() ? readAt : state.currentChat.lastMessage.readAt,
+                        }
+                      : state.currentChat.lastMessage,
+                  }
+                : state.currentChat,
+            };
+          });
+        });
 
         socket.on('user:online', ({ userId }: { userId: string }) => {
           set((state) => ({
@@ -625,6 +685,10 @@ export const useChatStore =
 
         socket.off(
           'chat:messageRead'
+        );
+
+        socket.off(
+          'chat:read'
         );
 
         socket.off(

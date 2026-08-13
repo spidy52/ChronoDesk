@@ -52,8 +52,22 @@ const ChatContainer = () => {
               <p className="text-sm font-medium">Say hello to start the conversation!</p>
             </div>
           ) : (
-            chatMessages.map((msg) => {
+            chatMessages.map((msg, index) => {
               const isMe = msg.senderId === myId;
+              
+              // Only show time for the 1st message or if there is a gap of more than 5 minutes since the previous message
+              let showTime = false;
+              if (index === 0) {
+                showTime = true;
+              } else {
+                const prevMsg = chatMessages[index - 1];
+                const timeDiff = new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime();
+                const fiveMinutes = 5 * 60 * 1000;
+                if (timeDiff > fiveMinutes) {
+                  showTime = true;
+                }
+              }
+
               return (
                 <MessageBubble
                   key={msg._id}
@@ -62,6 +76,7 @@ const ChatContainer = () => {
                   isMe={isMe}
                   readAt={msg.readAt}
                   deliveredAt={msg.deliveredAt}
+                  showTime={showTime}
                 />
               );
             })

@@ -53,9 +53,31 @@ export default function setupChatSocket(io: Server, socket: Socket) {
       const userId = socket.data.userId;
       
       const chat = await Chat.findById(chatId);
-      if (chat && chat.unreadCounts?.has(userId)) {
+      if (!chat) return;
+
+      // 1. Reset unread count for this user
+      if (chat.unreadCounts?.has(userId)) {
         chat.unreadCounts.set(userId, 0);
-        await chat.save();
+      }
+
+      // 2. Mark all messages from other users in this chat as read in the database
+      const readAt = new Date();
+      await Message.updateMany(
+        { chatId, senderId: { $ne: userId }, readAt: null },
+        { $set: { readAt } }
+      );
+
+      // 3. Update the last message read status if it was sent by someone else
+      if (chat.lastMessage && chat.lastMessage.senderId.toString() !== userId) {
+        chat.lastMessage.readAt = readAt;
+      }
+
+      await chat.save();
+
+      // 4. Notify other participants that this chat's messages have been read
+      const otherParticipants = chat.participants.filter((p: any) => p.toString() !== userId);
+      for (const p of otherParticipants) {
+        io.to(p.toString()).emit('chat:read', { chatId, readAt, readerId: userId });
       }
       
     } catch (error) {
