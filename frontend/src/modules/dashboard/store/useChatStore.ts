@@ -507,6 +507,10 @@ export const useChatStore =
       /* ================= SOCKET INIT ================= */
 
       initSocket: () => {
+        if (get().socketInitialized && socket.connected) {
+          return;
+        }
+
         get().cleanupSocket();
 
         const token = useAuthStore.getState().token;
@@ -531,6 +535,14 @@ export const useChatStore =
             const isCurrentActive = get().currentChat?._id === message.chatId;
             if (isCurrentActive) {
               socket.emit('chat:read', { chatId: message.chatId });
+            }
+
+            // If this chat is new and doesn't exist in our sidebar, fetch chats to load it
+            const chatExists = get().chats.some((c) => c._id === message.chatId);
+            if (!chatExists) {
+              setTimeout(() => {
+                get().fetchChats();
+              }, 0);
             }
 
             set(

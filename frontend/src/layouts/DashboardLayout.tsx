@@ -14,14 +14,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
   fullHeight?: boolean;
 }) {
-  const { initSocket, cleanupSocket } = useChatStore();
+  const { initSocket } = useChatStore();
   const { setupTaskSocketListeners } = useTaskStore();
 
   useEffect(() => {
     initSocket();
     setupTaskSocketListeners();
-    return () => cleanupSocket();
-  }, [initSocket, cleanupSocket, setupTaskSocketListeners]);
+  }, [initSocket, setupTaskSocketListeners]);
 
   /* ---------------- SIDEBAR ---------------- */
 

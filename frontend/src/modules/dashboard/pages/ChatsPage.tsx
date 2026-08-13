@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useChatStore } from '../store/useChatStore';
 import DashboardLayout from '../../../layouts/DashboardLayout';
 
@@ -5,7 +6,13 @@ import ChatSidebar from '../components/chat/ChatSidebar';
 import ChatContainer from '../components/chat/ChatContainer';
 
 export default function ChatsPage() {
-  const { currentChat } = useChatStore();
+  const { currentChat, setCurrentChat } = useChatStore();
+
+  useEffect(() => {
+    return () => {
+      setCurrentChat(null);
+    };
+  }, [setCurrentChat]);
 
   return (
     <DashboardLayout>

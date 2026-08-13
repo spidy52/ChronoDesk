@@ -204,6 +204,7 @@ export default function Sidebar({
               label="Logout"
               danger
               onClick={() => {
+                useChatStore.getState().reset();
                 logout();
                 navigate('/login');
               }}
