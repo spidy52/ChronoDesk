@@ -9,14 +9,42 @@ interface SendMailOptions {
 let cachedTransporter: nodemailer.Transporter | null = null;
 
 export async function sendMail(options: SendMailOptions): Promise<{ previewUrl?: string; messageId: string }> {
-  let transporter: nodemailer.Transporter;
-  let previewUrl: string | undefined;
-
   const hasSmtpConfig =
     process.env.SMTP_HOST &&
     process.env.SMTP_PORT &&
     process.env.SMTP_USER &&
     process.env.SMTP_PASS;
+
+  if (hasSmtpConfig && process.env.SMTP_HOST === 'smtp.resend.com') {
+    // Use Resend's HTTP REST API instead of SMTP to bypass cloud firewall blocks on port 465/587
+    console.log('[MAILER] Using Resend REST API for delivery...');
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SMTP_PASS}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.SMTP_FROM || 'ChronoDesk Support <onboarding@resend.dev>',
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      }),
+    });
+
+    const data: any = await response.json();
+    if (!response.ok) {
+      throw new Error(`Resend API Error: ${data.message || JSON.stringify(data)}`);
+    }
+
+    console.log(`[MAILER] Email sent successfully via Resend API: ${data.id}`);
+    return {
+      messageId: data.id,
+    };
+  }
+
+  let transporter: nodemailer.Transporter;
+  let previewUrl: string | undefined;
 
   if (cachedTransporter) {
     transporter = cachedTransporter;
