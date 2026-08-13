@@ -518,6 +518,9 @@ export const useChatStore =
           socket.connect();
         }
 
+        // Fetch chats list immediately on startup to load unread counts for the sidebar badge
+        get().fetchChats();
+
         socket.on(
           'message:received',
 
