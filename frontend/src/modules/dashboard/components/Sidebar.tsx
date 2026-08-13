@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { useAuthStore } from '../../auth/store';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import DeleteWorkspaceModal from './modals/DeleteWorkspaceModal';
+import { useChatStore } from '../store/useChatStore';
 
 export default function Sidebar({
   isOpen,
@@ -25,6 +26,8 @@ export default function Sidebar({
   const { user, logout } = useAuthStore();
   const { activeWorkspace, workspaces, setActiveWorkspace } = useWorkspaceStore();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const chats = useChatStore((state) => state.chats);
+  const totalUnread = chats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -59,6 +62,7 @@ export default function Sidebar({
       label: 'Chats',
       icon: <MessageSquare size={18} />,
       path: '/chats',
+      badge: totalUnread > 0 ? String(totalUnread) : undefined,
     },
   ];
 
