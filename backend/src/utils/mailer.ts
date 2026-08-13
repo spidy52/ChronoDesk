@@ -43,6 +43,49 @@ export async function sendMail(options: SendMailOptions): Promise<{ previewUrl?:
     };
   }
 
+  if (hasSmtpConfig && process.env.SMTP_HOST === 'smtp-relay.brevo.com') {
+    // Use Brevo's HTTP REST API instead of SMTP to bypass cloud firewall blocks on port 587/465
+    console.log('[MAILER] Using Brevo REST API for delivery...');
+    
+    // Extract display name and email address from SMTP_FROM
+    let senderName = 'ChronoDesk Support';
+    let senderEmail = process.env.SMTP_USER || 'itachi09061252@gmail.com';
+    
+    const smtpFrom = process.env.SMTP_FROM || '';
+    const match = smtpFrom.match(/^(?:"?([^"]*)"?\s)?(?:<([^>]+)>)$/);
+    if (match && match[2]) {
+      senderName = match[1] || 'ChronoDesk Support';
+      senderEmail = match[2];
+    } else if (smtpFrom && !smtpFrom.includes('<') && smtpFrom.includes('@')) {
+      senderEmail = smtpFrom;
+    }
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': process.env.SMTP_PASS || '',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: options.to }],
+        subject: options.subject,
+        htmlContent: options.html
+      })
+    });
+
+    const data: any = await response.json();
+    if (!response.ok) {
+      throw new Error(`Brevo API Error: ${data.message || JSON.stringify(data)}`);
+    }
+
+    console.log(`[MAILER] Email sent successfully via Brevo API: ${data.messageId}`);
+    return {
+      messageId: data.messageId,
+    };
+  }
+
   let transporter: nodemailer.Transporter;
   let previewUrl: string | undefined;
 
