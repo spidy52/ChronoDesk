@@ -796,8 +796,9 @@ function MemberCard({
 
             <img
               src={
-                member.avatar ||
-                `https://ui-avatars.com/api/?name=${member.name}`
+                member.avatar
+                  ? (member.avatar.startsWith('/uploads') ? `${BACKEND_URL}${member.avatar}` : member.avatar)
+                  : `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}`
               }
               alt={member.name}
               className="w-16 h-16 rounded-2xl object-cover"

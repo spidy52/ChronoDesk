@@ -8,8 +8,10 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 import User from '../../models/User';
+import { io } from '../../index';
 import { StorageEngine } from '../../utils/storage';
 import { sendMail, getResetPasswordHtml } from '../../utils/mailer';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
@@ -505,31 +507,35 @@ export const updateProfile = async (req: any, res: Response) => {
     if (name !== undefined) user.name = name;
     if (bio !== undefined) user.bio = bio;
 
-    // If avatar is base64 string, save it
+    // If avatar is base64 string, upload to Cloudinary
     if (avatar && avatar.startsWith('data:image')) {
-      const matches = avatar.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (matches && matches.length === 3) {
-        const buffer = Buffer.from(matches[2], 'base64');
-        const fileExtension = matches[1].split('/')[1] || 'png';
-        const filename = `avatar_${user.id}_${Date.now()}.${fileExtension}`;
-        
-        const avatarUrl = await StorageEngine.saveFile('avatars', filename, buffer);
-        user.avatar = avatarUrl;
-      }
+      const avatarUrl = await uploadToCloudinary(avatar);
+      user.avatar = avatarUrl;
+    } else if (avatar !== undefined) {
+      user.avatar = avatar;
     }
 
     await user.save();
 
+    const updatedUserData = {
+      id: user.id,
+      _id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      username: user.username,
+      avatar: user.avatar,
+      bio: user.bio,
+    };
+
+    try {
+      io.emit('user:updated', updatedUserData);
+    } catch (e) {
+      console.error('Failed to emit user:updated event:', e);
+    }
+
     res.json({
       message: 'Profile updated successfully',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        username: user.username,
-        avatar: user.avatar,
-        bio: user.bio,
-      }
+      user: updatedUserData,
     });
   } catch (error) {
     console.error('UpdateProfile error:', error);

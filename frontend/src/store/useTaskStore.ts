@@ -235,6 +235,39 @@ export const useTaskStore =
             tasks: state.tasks.filter((t) => t._id !== taskId),
           }));
         });
+
+        socket.off('user:updated');
+        socket.on('user:updated', (updatedUser: any) => {
+          const userId = updatedUser.id || updatedUser._id;
+          set((state) => ({
+            tasks: state.tasks.map((task) => {
+              let updated = false;
+              let newAssignee = task.assignee;
+              let newCollaborators = task.collaborators;
+
+              if (task.assignee && (task.assignee._id === userId || (task.assignee as any).id === userId)) {
+                newAssignee = { ...task.assignee, avatar: updatedUser.avatar, name: updatedUser.name };
+                updated = true;
+              }
+
+              if (task.collaborators && Array.isArray(task.collaborators)) {
+                if (task.collaborators.some((c: any) => c._id === userId || c.id === userId)) {
+                  newCollaborators = task.collaborators.map((c: any) =>
+                    (c._id === userId || c.id === userId)
+                      ? { ...c, avatar: updatedUser.avatar, name: updatedUser.name }
+                      : c
+                  );
+                  updated = true;
+                }
+              }
+
+              if (updated) {
+                return { ...task, assignee: newAssignee, collaborators: newCollaborators };
+              }
+              return task;
+            }),
+          }));
+        });
       },
     })
   );

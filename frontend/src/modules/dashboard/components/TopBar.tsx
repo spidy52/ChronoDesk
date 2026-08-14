@@ -88,12 +88,15 @@ export default function TopBar({
   const chats = useChatStore((state: any) => state.chats);
   const tasks = useTaskStore((state: any) => state.tasks);
 
-  const myTasks = tasks.filter((t: any) => {
-    const assigneeId = t.assignee?._id || t.assignee;
-    const currentUserId = user?.id || user?._id;
-    return assigneeId && currentUserId && assigneeId.toString() === currentUserId.toString();
+  const currentUserIdStr = (user?.id || user?._id)?.toString();
+  const allUserTasks = tasks.filter((t: any) => {
+    if (!currentUserIdStr) return false;
+    const assigneeId = (t.assignee?._id || t.assignee)?.toString();
+    const createdById = (t.createdBy?._id || t.createdBy)?.toString();
+    const isCollab = Array.isArray(t.collaborators) && t.collaborators.some((c: any) => (c._id || c)?.toString() === currentUserIdStr);
+    return assigneeId === currentUserIdStr || createdById === currentUserIdStr || isCollab;
   });
-  const completedTasksCount = myTasks.filter((t: any) => t.status?.toLowerCase() === 'completed').length;
+  const completedTasksCount = allUserTasks.filter((t: any) => t.status?.toLowerCase() === 'completed' || t.status?.toLowerCase() === 'complete').length;
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -123,27 +126,45 @@ export default function TopBar({
     | null
   >(null);
 
+  // Automatically close floating dropdowns in a single click when clicking anywhere outside
+  useEffect(() => {
+    if (!activeDropdown) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      if (target.closest && target.closest('[data-dropdown-container="true"]')) {
+        return;
+      }
+
+      setActiveDropdown(null);
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+    };
+  }, [activeDropdown]);
+
   const [myProfileOpen, setMyProfileOpen] = useState(false);
 
-  // Sync profile details and store counts in real-time when the modal opens
+  // Sync profile details on mount and when modal opens
   useEffect(() => {
-    if (myProfileOpen) {
-      // Sync profile fields from backend (avatar, bio, createdAt)
-      api.get('/auth/profile')
-        .then((res) => {
-          if (res.data?.user) {
-            updateUser(res.data.user);
-          }
-        })
-        .catch((err) => console.error('Failed to sync profile:', err));
+    api.get('/auth/profile')
+      .then((res) => {
+        if (res.data?.user) {
+          updateUser(res.data.user);
+        }
+      })
+      .catch((err) => console.error('Failed to sync profile:', err));
 
-      // Refresh chats count
+    if (myProfileOpen) {
       const chatStore = useChatStore.getState();
       if (chatStore.fetchChats) {
         chatStore.fetchChats();
       }
 
-      // Refresh tasks count
       const taskStore = useTaskStore.getState();
       if (taskStore.fetchAllTasks) {
         taskStore.fetchAllTasks();
@@ -203,11 +224,21 @@ export default function TopBar({
       fetchInvitations();
     };
 
+    const handleUserUpdated = (updatedUser: any) => {
+      const currentUserId = user?.id || user?._id;
+      const targetUserId = updatedUser.id || updatedUser._id;
+      if (currentUserId && targetUserId && currentUserId.toString() === targetUserId.toString()) {
+        updateUser(updatedUser);
+      }
+    };
+
     socket.on('invitation:sent', handleNewInvitation);
+    socket.on('user:updated', handleUserUpdated);
 
     return () => {
       clearTimeout(timer);
       socket.off('invitation:sent', handleNewInvitation);
+      socket.off('user:updated', handleUserUpdated);
     };
 
   }, []);
@@ -345,6 +376,7 @@ export default function TopBar({
         <div className="relative">
 
           <button
+            data-dropdown-trigger="true"
             onClick={() =>
               setActiveDropdown(
                 activeDropdown ===
@@ -375,7 +407,7 @@ export default function TopBar({
           {activeDropdown ===
             'mail' && (
 
-            <div className="absolute right-0 top-14 w-[380px] bg-card border rounded-3xl shadow-2xl p-4 z-50">
+            <div data-dropdown-container="true" className="fixed md:absolute top-16 left-4 right-4 md:left-auto md:top-14 md:right-0 md:w-[380px] max-w-[calc(100vw-2rem)] mx-auto bg-card border border-border/80 rounded-3xl shadow-2xl p-4 z-50">
 
               {/* HEADER */}
 
@@ -475,6 +507,7 @@ export default function TopBar({
         <div className="relative">
 
           <button
+            data-dropdown-trigger="true"
             onClick={() =>
               setActiveDropdown(
                 activeDropdown ===
@@ -486,15 +519,16 @@ export default function TopBar({
             className="flex items-center gap-1 bg-card border rounded-full p-1.5 md:pl-2 md:pr-4 md:py-2 hover:bg-secondary transition-all"
           >
 
-            <div className="w-6 h-6 md:w-9 md:h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-[10px] md:text-sm">
-
-              {user?.name?.charAt(
-                0
-              ) ||
-                user?.email?.charAt(
-                  0
-                ) ||
-                'U'}
+            <div className="w-6 h-6 md:w-9 md:h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-[10px] md:text-sm overflow-hidden">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar.startsWith('/uploads') ? `${api.defaults.baseURL?.replace('/api', '') || ''}${user.avatar}` : user.avatar}
+                  alt="avatar"
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'
+              )}
             </div>
 
             <span className="hidden md:inline font-medium text-sm">
@@ -512,7 +546,7 @@ export default function TopBar({
           {activeDropdown ===
             'profile' && (
 
-            <div className="absolute right-0 top-14 w-60 bg-card border rounded-3xl shadow-2xl p-2 z-50">
+            <div data-dropdown-container="true" className="absolute right-0 top-14 w-60 bg-card border rounded-3xl shadow-2xl p-2 z-50">
 
               <ProfileButton
                 icon={
@@ -568,6 +602,7 @@ export default function TopBar({
           <div className="relative">
 
           <button
+            data-dropdown-trigger="true"
             onClick={() =>
               setActiveDropdown(
                 activeDropdown ===
@@ -576,55 +611,104 @@ export default function TopBar({
                   : 'filters'
               )
             }
-            className="flex items-center gap-1 md:gap-2 text-sm font-medium text-muted-foreground hover:text-foreground p-2 md:px-3 md:py-2 rounded-xl hover:bg-secondary transition-all"
+            className="flex items-center gap-1 md:gap-2 text-sm font-medium text-muted-foreground hover:text-foreground p-2 md:px-3 md:py-2 rounded-xl hover:bg-secondary transition-all relative"
           >
-
             <span className="hidden md:inline">Filter</span>
-
             <Filter size={16} />
+            {activeFilter && activeFilter.split(',').filter(Boolean).length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
+                {activeFilter.split(',').filter(Boolean).length}
+              </span>
+            )}
           </button>
 
-          {activeDropdown ===
-            'filters' && (
+          {activeDropdown === 'filters' && (() => {
+            const selectedFilters = activeFilter ? activeFilter.split(',').filter(Boolean) : [];
+            const toggleFilter = (key: string) => {
+              const exists = selectedFilters.includes(key);
+              let next: string[];
+              if (exists) {
+                next = selectedFilters.filter(f => f !== key);
+              } else {
+                next = [...selectedFilters, key];
+              }
+              setActiveFilter(next.length > 0 ? next.join(',') : null);
+            };
 
-            <div className="absolute top-14 right-0 bg-card border rounded-2xl shadow-2xl p-3 w-52 z-50">
+            const filterGroups = [
+              {
+                title: 'Priority',
+                options: [
+                  { key: 'low', label: 'Low' },
+                  { key: 'medium', label: 'Medium' },
+                  { key: 'high', label: 'High' },
+                ]
+              },
+              {
+                title: 'Status',
+                options: [
+                  { key: 'todo', label: 'To Do' },
+                  { key: 'inprogress', label: 'In Progress' },
+                  { key: 'review', label: 'Review' },
+                  { key: 'completed', label: 'Completed' },
+                ]
+              }
+            ];
 
-              {[
-                'low',
-                'medium',
-                'high',
-              ].map((priority) => (
+            return (
+              <div data-dropdown-container="true" className="absolute top-14 right-0 bg-card border rounded-2xl shadow-2xl p-4 w-60 z-50">
+                <div className="flex items-center justify-between pb-2 border-b border-border/40 mb-3">
+                  <span className="text-xs font-bold text-foreground uppercase tracking-wider">Filter Tasks</span>
+                  {selectedFilters.length > 0 && (
+                    <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">
+                      {selectedFilters.length} active
+                    </span>
+                  )}
+                </div>
 
-                <button
-                  key={priority}
-                  onClick={() => {
+                <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
+                  {filterGroups.map((group) => (
+                    <div key={group.title} className="space-y-1">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block px-1">
+                        {group.title}
+                      </span>
+                      {group.options.map((option) => {
+                        const isChecked = selectedFilters.includes(option.key);
+                        return (
+                          <label
+                            key={option.key}
+                            onClick={() => toggleFilter(option.key)}
+                            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-secondary/70 cursor-pointer transition-all text-sm font-medium text-foreground select-none"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              readOnly
+                              className="w-4 h-4 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer"
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
 
-                    setActiveFilter(
-                      activeFilter ===
-                        priority
-                        ? null
-                        : priority
-                    );
-
-                    setActiveDropdown(
-                      null
-                    );
-                  }}
-                  className={`
-                    w-full text-left px-4 py-3 rounded-xl text-sm transition-all
-                    ${
-                      activeFilter ===
-                      priority
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-secondary'
-                    }
-                  `}
-                >
-                  {priority}
-                </button>
-              ))}
-            </div>
-          )}
+                {/* Clear All Option */}
+                <div className="pt-3 mt-3 border-t border-border/40">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveFilter(null);
+                    }}
+                    className="w-full text-center py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold transition-all border border-red-500/20 cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         )}
 
@@ -797,8 +881,8 @@ export default function TopBar({
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform mb-2">
                       <List size={16} />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tasks Assigned</span>
-                    <h4 className="text-xl font-bold text-foreground mt-1">{myTasks.length}</h4>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Tasks</span>
+                    <h4 className="text-xl font-bold text-foreground mt-1">{allUserTasks.length}</h4>
                   </div>
 
                   {/* Done Metric Card */}

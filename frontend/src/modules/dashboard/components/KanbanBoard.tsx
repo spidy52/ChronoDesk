@@ -77,10 +77,25 @@ export default function KanbanBoard({
       const currentWorkspaceId = activeWorkspace?._id || 'default';
       const matchesWorkspace = task.workspaceId === currentWorkspaceId;
 
-      const matchesFilter =
-        !activeFilter ||
-        task.priority ===
-          activeFilter;
+      let matchesFilter = true;
+      if (activeFilter) {
+        const selectedFilters = activeFilter.split(',').filter(Boolean);
+        if (selectedFilters.length > 0) {
+          const priorityFilters = selectedFilters.filter(f => ['low', 'medium', 'high'].includes(f));
+          const statusFilters = selectedFilters.filter(f => ['todo', 'inprogress', 'in-progress', 'review', 'complete', 'completed'].includes(f));
+
+          const matchesPriority = priorityFilters.length === 0 || priorityFilters.includes(task.priority?.toLowerCase() || '');
+          
+          const taskStatus = task.status?.toLowerCase() || '';
+          const matchesStatus = statusFilters.length === 0 || statusFilters.some(sf => {
+            if (sf === 'inprogress' || sf === 'in-progress') return taskStatus === 'inprogress' || taskStatus === 'in-progress';
+            if (sf === 'complete' || sf === 'completed') return taskStatus === 'complete' || taskStatus === 'completed';
+            return taskStatus === sf;
+          });
+
+          matchesFilter = matchesPriority && matchesStatus;
+        }
+      }
 
       const matchesSearch =
         task.title

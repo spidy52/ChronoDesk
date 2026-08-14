@@ -9,6 +9,7 @@ import {
   LogOut,
   Trash2,
   Home,
+  Plus,
 } from 'lucide-react';
 
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -16,7 +17,9 @@ import { useState } from 'react';
 import { useAuthStore } from '../../auth/store';
 import { useWorkspaceStore } from '../../../store/workspaceStore';
 import DeleteWorkspaceModal from './modals/DeleteWorkspaceModal';
+import CreateWorkspaceModal from './modals/CreateWorkspaceModal';
 import { useChatStore } from '../store/useChatStore';
+import { BACKEND_URL } from '@/config';
 
 export default function Sidebar({
   isOpen,
@@ -26,6 +29,7 @@ export default function Sidebar({
   const { user, logout } = useAuthStore();
   const { activeWorkspace, workspaces, setActiveWorkspace } = useWorkspaceStore();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const chats = useChatStore((state) => state.chats);
   const totalUnread = chats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
 
@@ -76,22 +80,27 @@ export default function Sidebar({
             ? 'w-72 opacity-100'
             : 'w-0 opacity-0'
         }
-        h-full bg-card border-r border-border/50 flex flex-col shrink-0 z-20
+        h-full bg-card border-r border-border/50 flex flex-col shrink-0 z-40 md:z-20
       `}
     >
 
       {/* PROFILE */}
-      <div className="p-8 flex flex-col items-center border-b border-border/50">
+      <div className="px-6 pb-6 pt-20 md:pt-8 flex flex-col items-center border-b border-border/50">
 
         <div className="relative mb-5">
 
-          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
-
-            <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-3xl">
-              {user?.name?.charAt(0) ||
-                user?.email?.charAt(0) 
-                }
-            </div>
+          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner overflow-hidden">
+            {user?.avatar ? (
+              <img
+                src={user.avatar.startsWith('/uploads') ? `${BACKEND_URL}${user.avatar}` : user.avatar}
+                alt={user?.name || 'Avatar'}
+                className="w-full h-full object-cover rounded-full"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-3xl">
+                {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+              </div>
+            )}
           </div>
 
           {/* Online Dot */}
@@ -117,9 +126,19 @@ export default function Sidebar({
 
         {/* WORKSPACES (DASHBOARDS) - MOBILE ONLY */}
         <div className="md:hidden mb-6">
-          <h3 className="text-xs uppercase tracking-widest text-muted-foreground px-4 mb-3 font-semibold">
-            Dashboards
-          </h3>
+          <div className="flex items-center justify-between px-2 mb-3">
+            <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
+              Dashboards & Workspaces
+            </h3>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-1 text-xs text-primary font-bold hover:underline bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-lg cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>New</span>
+            </button>
+          </div>
+
           <div className="space-y-1">
             {/* Personal Home */}
             <button
@@ -157,6 +176,17 @@ export default function Sidebar({
                 <span>{workspace.name}</span>
               </button>
             ))}
+
+            {/* Add New Workspace Button for Mobile */}
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium border border-dashed border-primary/40 text-primary hover:bg-primary/10 transition-all mt-2 cursor-pointer"
+            >
+              <div className="w-5 h-5 rounded-md bg-primary/20 flex items-center justify-center">
+                <Plus size={14} />
+              </div>
+              <span>Add New Workspace</span>
+            </button>
           </div>
           <div className="h-px bg-border/50 my-4"></div>
         </div>
@@ -225,6 +255,10 @@ export default function Sidebar({
 
       {isDeleteModalOpen && (
         <DeleteWorkspaceModal onClose={() => setIsDeleteModalOpen(false)} />
+      )}
+
+      {isCreateModalOpen && (
+        <CreateWorkspaceModal onClose={() => setIsCreateModalOpen(false)} />
       )}
     </div>
   );

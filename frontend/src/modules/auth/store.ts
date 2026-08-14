@@ -94,9 +94,12 @@ export const useAuthStore =
       }
     },
 
-    updateUser: (user: User) => {
-      localStorage.setItem('user', JSON.stringify(user));
-      set({ user });
+    updateUser: (newUser: User) => {
+      set((state) => {
+        const merged = { ...state.user, ...newUser };
+        localStorage.setItem('user', JSON.stringify(merged));
+        return { user: merged };
+      });
     },
 
     logout: () => {

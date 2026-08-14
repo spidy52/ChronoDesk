@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '../../auth/store';
 import DashboardLayout from '../../../layouts/DashboardLayout';
 import { useUIStore } from '../../../store/useUIStore';
+import { useTaskStore } from '../../../store/useTaskStore';
 import { api } from '../../../lib/axios';
 import { BACKEND_URL } from '@/config';
 
@@ -32,6 +33,15 @@ export default function SettingsPage() {
   const [profileError, setProfileError] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Avatar cropping state
+  const [imageToCrop, setImageToCrop] = useState('');
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
+  const [cropZoom, setCropZoom] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [imgNaturalSize, setImgNaturalSize] = useState({ width: 0, height: 0 });
 
   // Security state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -84,6 +94,73 @@ export default function SettingsPage() {
     }
   }, [user]);
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - cropPosition.x, y: e.clientY - cropPosition.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setCropPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      setDragStart({
+        x: e.touches[0].clientX - cropPosition.x,
+        y: e.touches[0].clientY - cropPosition.y,
+      });
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    if (e.touches.length === 1) {
+      setCropPosition({
+        x: e.touches[0].clientX - dragStart.x,
+        y: e.touches[0].clientY - dragStart.y,
+      });
+    }
+  };
+
+  const handleCropSave = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 300;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new Image();
+    img.src = imageToCrop;
+    img.onload = () => {
+      ctx.clearRect(0, 0, 300, 300);
+
+      const size = Math.min(img.width, img.height);
+      const scale = cropZoom * (300 / size);
+      const drawWidth = img.width * scale;
+      const drawHeight = img.height * scale;
+      
+      const dx = (300 - drawWidth) / 2 + cropPosition.x;
+      const dy = (300 - drawHeight) / 2 + cropPosition.y;
+
+      ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
+
+      const croppedDataUrl = canvas.toDataURL('image/png');
+      setAvatar(croppedDataUrl);
+      setIsCropModalOpen(false);
+      setImageToCrop('');
+      toast.success('Avatar cropped! Click Save Changes below to save.');
+    };
+  };
+
   const handleSaveProfile = async () => {
     if (!firstName) {
       setProfileError('First Name is required');
@@ -99,10 +176,11 @@ export default function SettingsPage() {
       const response = await api.put('/auth/profile', {
         name,
         bio,
-        avatar: avatar.startsWith('data:image') ? avatar : undefined,
+        avatar: avatar.startsWith('data:image') ? avatar : (avatar === '' ? '' : avatar),
       });
 
       updateUser(response.data.user);
+      useTaskStore.getState().fetchAllTasks();
       setProfileSuccess('Profile updated successfully');
       toast.success('Profile updated successfully');
     } catch (err: any) {
@@ -196,7 +274,7 @@ export default function SettingsPage() {
                 <h2 className="text-3xl font-extrabold tracking-tight mb-2">Account Settings</h2>
                 <p className="text-sm text-muted-foreground">Manage your settings and preferences</p>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 hidden md:block">
                 {menuItems.map((item) => (
                   <button
                     key={item.id}
@@ -228,32 +306,55 @@ export default function SettingsPage() {
                       user?.name?.charAt(0) || 'U'
                     )}
                   </div>
-                  <div>
-                    <label className="bg-secondary text-foreground px-4 py-2 rounded-xl text-sm font-medium hover:bg-secondary/80 transition-all border border-border cursor-pointer">
-                      Change Avatar
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 1024 * 1024) {
-                              setProfileError('Avatar image must be under 1MB');
-                              toast.error('Avatar image must be under 1MB');
-                              return;
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      <label className="bg-secondary text-foreground px-4 py-2 rounded-xl text-sm font-medium hover:bg-secondary/80 transition-all border border-border cursor-pointer inline-block">
+                        Change Avatar
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 10 * 1024 * 1024) {
+                                setProfileError('Avatar image must be under 10MB');
+                                toast.error('Avatar image must be under 10MB');
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                const img = new Image();
+                                img.src = reader.result as string;
+                                img.onload = () => {
+                                  setImgNaturalSize({ width: img.width, height: img.height });
+                                  setImageToCrop(reader.result as string);
+                                  setCropPosition({ x: 0, y: 0 });
+                                  setCropZoom(1);
+                                  setIsCropModalOpen(true);
+                                };
+                              };
+                              reader.readAsDataURL(file);
                             }
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setAvatar(reader.result as string);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      JPG, GIF or PNG. 1MB max.
+                          }}
+                        />
+                      </label>
+                      {avatar && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAvatar('');
+                            toast.success('Avatar removed. Click Save Changes to save.');
+                          }}
+                          className="bg-red-500/10 text-red-500 hover:bg-red-500/20 px-4 py-2 rounded-xl text-sm font-medium transition-all border border-red-500/20 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      JPG, GIF or PNG. 10MB max (Auto-compressed).
                     </p>
                   </div>
                 </div>
@@ -636,6 +737,103 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* CROP AVATAR MODAL */}
+      {isCropModalOpen && imageToCrop && (() => {
+        const baseScale = 300 / Math.min(imgNaturalSize.width || 1, imgNaturalSize.height || 1);
+        const dispWidth = imgNaturalSize.width * baseScale;
+        const dispHeight = imgNaturalSize.height * baseScale;
+        return (
+          <div className="fixed inset-0 z-[1000] bg-black/85 flex flex-col items-center justify-center p-6 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-3xl p-6 shadow-2xl space-y-6 relative flex flex-col items-center">
+              
+              {/* Header */}
+              <div className="w-full flex items-center justify-between">
+                <div>
+                  <h4 className="text-xl font-bold text-white">Crop Avatar</h4>
+                  <p className="text-xs text-zinc-400 mt-1">Drag image to position, slide to zoom</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsCropModalOpen(false);
+                    setImageToCrop('');
+                  }}
+                  className="w-8 h-8 rounded-xl hover:bg-zinc-900 border border-transparent hover:border-zinc-800 flex items-center justify-center text-zinc-400 transition-all cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Circular Crop Viewport */}
+              <div 
+                className="relative w-[300px] h-[300px] rounded-full border-2 border-primary shadow-2xl overflow-hidden cursor-move bg-zinc-900 flex items-center justify-center select-none"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleMouseUp}
+              >
+                <img
+                  src={imageToCrop}
+                  alt="Crop Viewport"
+                  draggable={false}
+                  style={{
+                    position: 'absolute',
+                    width: `${dispWidth}px`,
+                    height: `${dispHeight}px`,
+                    transform: `translate(${cropPosition.x}px, ${cropPosition.y}px) scale(${cropZoom})`,
+                    transformOrigin: 'center center',
+                    pointerEvents: 'none',
+                    maxWidth: 'none',
+                    maxHeight: 'none',
+                  }}
+                />
+                <div className="absolute inset-0 rounded-full border border-primary/40 pointer-events-none" />
+              </div>
+
+              {/* Zoom Slider */}
+              <div className="w-full space-y-2">
+                <div className="flex justify-between items-center text-xs text-zinc-400">
+                  <span>Zoom</span>
+                  <span>{Math.round(cropZoom * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="4"
+                  step="0.05"
+                  value={cropZoom}
+                  onChange={(e) => setCropZoom(parseFloat(e.target.value))}
+                  className="w-full accent-primary bg-zinc-800 rounded-lg appearance-none h-1.5 cursor-pointer outline-none"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center gap-4 w-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCropModalOpen(false);
+                    setImageToCrop('');
+                  }}
+                  className="flex-1 border border-zinc-800 text-zinc-300 rounded-2xl py-3 hover:bg-zinc-900 transition-all font-medium text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCropSave}
+                  className="flex-1 bg-primary text-primary-foreground rounded-2xl py-3 hover:opacity-90 transition-all font-medium text-sm cursor-pointer"
+                >
+                  Apply Crop
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </DashboardLayout>
   );
 }
