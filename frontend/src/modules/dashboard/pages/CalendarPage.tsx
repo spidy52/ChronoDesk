@@ -15,6 +15,7 @@ import {
   CalendarDays,
   Video,
   Trash2,
+  Crown,
 } from 'lucide-react';
 
 import { useEventStore } from '../../../store/useEventStore';
@@ -42,8 +43,8 @@ export default function CalendarPage() {
       new Date().getDate()
     );
 
-  const [openModal, setOpenModal] =
-    useState(false);
+  const [openModal, setOpenModal] = useState(false);
+  const [showImportantOnly, setShowImportantOnly] = useState(false);
 
   const [currentMonth, setCurrentMonth] =
     useState(
@@ -79,7 +80,7 @@ export default function CalendarPage() {
 
         meetingLink:
           data.meetingLink ||
-          'https://meet.google.com/abc-defg-hij',
+          '',
       });
 
       setOpenModal(false);
@@ -275,46 +276,70 @@ export default function CalendarPage() {
             </p>
           </div>
 
-          {/* SELECTED DATE */}
-
+          {/* SCHEDULE HEADER */}
           <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold">
+                  {showImportantOnly ? 'Important Meetings' : 'Schedule'}
+                </h2>
+                <span className="text-xs text-muted-foreground">
+                  {showImportantOnly ? 'All VIP meetings' : `${selectedDay} ${monthName}`}
+                </span>
+              </div>
 
-            <div className="flex items-center justify-between mb-5">
-
-              <h2 className="text-xl font-bold">
-                Schedule
-              </h2>
-
-              <span className="text-sm text-muted-foreground">
-
-                {selectedDay} {monthName}
-              </span>
+              {/* Crown Filter Pill Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowImportantOnly(!showImportantOnly)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${
+                  showImportantOnly
+                    ? 'bg-amber-500 text-black border-amber-500 shadow-md scale-105'
+                    : 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20'
+                }`}
+              >
+                <Crown size={14} className={showImportantOnly ? 'fill-black' : 'fill-amber-500/30'} />
+                <span>Important</span>
+                {events.filter((e: any) => e.isImportant).length > 0 && (
+                  <span className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center font-extrabold ${
+                    showImportantOnly ? 'bg-black text-amber-500' : 'bg-amber-500/20 text-amber-500'
+                  }`}>
+                    {events.filter((e: any) => e.isImportant).length}
+                  </span>
+                )}
+              </button>
             </div>
 
             <div className="space-y-4">
-
-              {selectedEvents.length === 0 &&
-                selectedTasks.length === 0 && (
-
-                <div
-                  className="
-                    border
-                    rounded-3xl
-                    p-6
-                    text-center
-                    bg-background
-                  "
-                >
-
-                  <h3 className="font-bold text-lg mb-2">
-                    No Schedule
-                  </h3>
-
-                  <p className="text-sm text-muted-foreground">
-                    No meetings or tasks for this date.
-                  </p>
-                </div>
-              )}
+              {showImportantOnly ? (
+                events.filter((e: any) => e.isImportant).length === 0 ? (
+                  <div className="border rounded-3xl p-6 text-center bg-background">
+                    <h3 className="font-bold text-lg mb-2">No Important Meetings</h3>
+                    <p className="text-sm text-muted-foreground">
+                      No meetings marked as important yet.
+                    </p>
+                  </div>
+                ) : (
+                  events
+                    .filter((e: any) => e.isImportant)
+                    .map((event: any) => (
+                      <EventCard
+                        key={event._id}
+                        event={event}
+                        onDelete={removeEvent}
+                      />
+                    ))
+                )
+              ) : (
+                <>
+                  {selectedEvents.length === 0 && selectedTasks.length === 0 && (
+                    <div className="border rounded-3xl p-6 text-center bg-background">
+                      <h3 className="font-bold text-lg mb-2">No Schedule</h3>
+                      <p className="text-sm text-muted-foreground">
+                        No meetings or tasks for this date.
+                      </p>
+                    </div>
+                  )}
 
               {selectedEvents.map(
                 (event: any) => (
@@ -329,14 +354,16 @@ export default function CalendarPage() {
                 )
               )}
 
-              {selectedTasks.map(
-                (task: any) => (
+                  {selectedTasks.map(
+                    (task: any) => (
 
-                  <TaskRow
-                    key={task._id}
-                    task={task}
-                  />
-                )
+                      <TaskRow
+                        key={task._id}
+                        task={task}
+                      />
+                    )
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -513,11 +540,12 @@ export default function CalendarPage() {
                       {date}
                     </span>
 
-                    {(dayEvents.length >
-                      0 ||
-                      dayTasks.length >
-                        0) && (
-                      <div className="w-2 h-2 rounded-full bg-red-500" />
+                    {dayEvents.some((e: any) => e.isImportant) ? (
+                      <Crown size={14} className="text-amber-500 fill-amber-500/30" />
+                    ) : (
+                      (dayEvents.length > 0 || dayTasks.length > 0) && (
+                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                      )
                     )}
                   </div>
 
@@ -624,21 +652,17 @@ function EventCard({
 
       <div className="flex items-center justify-between mb-3">
 
-        <span
-          className="
-            px-3
-            py-1
-            rounded-xl
-            bg-primary/10
-            text-primary
-            text-xs
-            font-semibold
-          "
-        >
-
-          {event.type ||
-            'Program'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1 rounded-xl bg-primary/10 text-primary text-xs font-semibold">
+            {event.type || 'Program'}
+          </span>
+          {event.isImportant && (
+            <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-500 text-xs font-bold border border-amber-500/30 flex items-center gap-1">
+              <Crown size={12} className="fill-amber-500/30" />
+              Important
+            </span>
+          )}
+        </div>
 
         <button
           onClick={() =>
@@ -708,61 +732,31 @@ function EventCard({
         </span>
       </div>
 
-      {/* SESSION */}
+      {/* LINK & JOIN ACTION */}
+      {event.meetingLink && (
+        <>
+          <div className="flex items-center gap-2 text-xs text-primary font-medium mb-2 mt-2">
+            <Video size={14} />
+            Online Session
+          </div>
 
-      <div
-        className="
-          flex
-          items-center
-          gap-2
-          text-sm
-          text-muted-foreground
-          mb-2
-        "
-      >
+          <p className="text-[11px] text-muted-foreground truncate mb-4">
+            {event.meetingLink}
+          </p>
 
-        <Video size={14} />
-
-        Online Session
-      </div>
-
-      {/* LINK */}
-
-      <p
-        className="
-          text-[11px]
-          text-muted-foreground
-          truncate
-          mb-4
-        "
-      >
-
-        {event.meetingLink}
-      </p>
-
-      {/* ACTION */}
-
-      <button
-        onClick={() =>
-          window.open(
-            event.meetingLink,
-            '_blank'
-          )
-        }
-        className="
-          w-full
-          py-2.5
-          rounded-2xl
-          bg-primary
-          text-primary-foreground
-          font-medium
-          transition-all
-          hover:opacity-90
-        "
-      >
-
-        Join Meeting
-      </button>
+          <button
+            onClick={() =>
+              window.open(
+                event.meetingLink.startsWith('http') ? event.meetingLink : `https://${event.meetingLink}`,
+                '_blank'
+              )
+            }
+            className="w-full py-2.5 rounded-2xl bg-primary text-primary-foreground font-medium transition-all hover:opacity-90 cursor-pointer"
+          >
+            Join Meeting
+          </button>
+        </>
+      )}
     </div>
   );
 }

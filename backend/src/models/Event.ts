@@ -35,6 +35,11 @@ const eventSchema =
         type: String,
       },
 
+      isImportant: {
+        type: Boolean,
+        default: false,
+      },
+
       workspaceId: {
         type:
           mongoose.Schema.Types

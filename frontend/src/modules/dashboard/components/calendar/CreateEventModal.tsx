@@ -1,6 +1,7 @@
 import {
   useState,
 } from 'react';
+import { Crown } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -33,6 +34,12 @@ export default function CreateEventModal({
   const [endTime, setEndTime] =
     useState('');
 
+  const [meetingLink, setMeetingLink] =
+    useState('');
+
+  const [isImportant, setIsImportant] =
+    useState(false);
+
   if (!open) return null;
 
   const handleCreate =
@@ -48,6 +55,10 @@ export default function CreateEventModal({
         startTime,
 
         endTime,
+
+        meetingLink,
+
+        isImportant,
       });
 
       setTitle('');
@@ -55,6 +66,8 @@ export default function CreateEventModal({
       setDate('');
       setStartTime('');
       setEndTime('');
+      setMeetingLink('');
+      setIsImportant(false);
     };
 
   return (
@@ -185,6 +198,42 @@ export default function CreateEventModal({
               outline-none
             "
           />
+
+          {/* MEETING LINK */}
+
+          <input
+            type="url"
+            placeholder="Meeting Link (e.g. https://meet.google.com/abc-defg-hij)"
+            value={meetingLink}
+            onChange={(e) =>
+              setMeetingLink(
+                e.target.value
+              )
+            }
+            className="
+              w-full
+              bg-secondary
+              rounded-2xl
+              px-4
+              py-3
+              outline-none
+            "
+          />
+
+          {/* IMPORTANT MEETING TOGGLE */}
+
+          <label className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 cursor-pointer transition-all hover:bg-amber-500/20 select-none">
+            <input
+              type="checkbox"
+              checked={isImportant}
+              onChange={(e) => setIsImportant(e.target.checked)}
+              className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 accent-amber-500 cursor-pointer"
+            />
+            <div className="flex items-center gap-2 text-amber-500 font-bold text-sm">
+              <Crown size={18} className="fill-amber-500/20 text-amber-500" />
+              <span>Mark as Important Meeting (Crown)</span>
+            </div>
+          </label>
         </div>
 
         {/* ACTIONS */}

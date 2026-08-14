@@ -28,7 +28,10 @@ export const createEvent =
             req.user?.userId,
 
           meetingLink:
-            `https://meet.chronodesk.com/${Date.now()}`,
+            req.body.meetingLink || '',
+
+          isImportant:
+            Boolean(req.body.isImportant),
         });
 
       res.status(201).json({
