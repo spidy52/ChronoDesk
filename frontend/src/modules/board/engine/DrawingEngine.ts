@@ -285,6 +285,17 @@ export const DrawingEngine = {
       const threshold = ((el as any).strokeWidth || 4) + 8;
       return distance < threshold;
     }
+    if (el.tool === 'text') {
+      const text = (el as any).text || '';
+      const fontSize = (el as any).fontSize || 24;
+      const lines = text.split('\n');
+      const maxLineLen = Math.max(...lines.map((l: string) => l.length), 1);
+      const estWidth = Math.max(el.width || 150, maxLineLen * (fontSize * 0.65) + 30);
+      const estHeight = Math.max(el.height || 30, lines.length * (fontSize * 1.3) + 20);
+      
+      const lp = this.worldToLocal(px, py, el);
+      return lp.x >= -15 && lp.x <= estWidth && lp.y >= -15 && lp.y <= estHeight;
+    }
     const lp = this.worldToLocal(px, py, el);
     const minX = Math.min(0, el.width);
     const maxX = Math.max(0, el.width);

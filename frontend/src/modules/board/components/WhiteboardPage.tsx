@@ -113,8 +113,8 @@ export default function WhiteboardPage() {
   // Synchronize undo/redo buttons state reactively with Yjs history stack
   useEffect(() => {
     const updateUndoRedoState = () => {
-      setCanUndo(RealtimeEngine.undoManager.canUndo());
-      setCanRedo(RealtimeEngine.undoManager.canRedo());
+      setCanUndo(RealtimeEngine.canUndo());
+      setCanRedo(RealtimeEngine.canRedo());
     };
 
     updateUndoRedoState();
@@ -128,7 +128,7 @@ export default function WhiteboardPage() {
       RealtimeEngine.undoManager.off('stack-item-popped', updateUndoRedoState);
       RealtimeEngine.undoManager.off('stack-item-updated', updateUndoRedoState);
     };
-  }, []);
+  }, [elements]);
 
   // Drawing interactions state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -848,7 +848,7 @@ export default function WhiteboardPage() {
 
   // Commit text from input editor overlay
   const handleTextCommit = (fromBlur?: boolean) => {
-    if (!textInput || !board) return;
+    if (!textInput) return;
     if (fromBlur && Date.now() - textInputMountTimeRef.current < 200) {
       return;
     }
@@ -1397,8 +1397,12 @@ export default function WhiteboardPage() {
                     } as BoardElement;
                     RealtimeEngine.updateElementLocally(updated);
                   }}
-                  onBlur={() => {
-                    RealtimeEngine.commitElement('UPDATE_ELEMENT', selectedElement);
+                  onBlur={(e) => {
+                    const updated = {
+                      ...selectedElement,
+                      text: e.target.value,
+                    } as BoardElement;
+                    RealtimeEngine.commitElement('UPDATE_ELEMENT', updated);
                     SnapshotEngine.logEvent();
                   }}
                   onKeyDown={(e) => e.stopPropagation()}
@@ -1961,8 +1965,12 @@ export default function WhiteboardPage() {
                         } as BoardElement;
                         RealtimeEngine.updateElementLocally(updated);
                       }}
-                      onBlur={() => {
-                        RealtimeEngine.commitElement('UPDATE_ELEMENT', selectedElement);
+                      onBlur={(e) => {
+                        const updated = {
+                          ...selectedElement,
+                          text: e.target.value,
+                        } as BoardElement;
+                        RealtimeEngine.commitElement('UPDATE_ELEMENT', updated);
                         SnapshotEngine.logEvent();
                       }}
                       onKeyDown={(e) => e.stopPropagation()}

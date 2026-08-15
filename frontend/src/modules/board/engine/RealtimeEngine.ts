@@ -69,7 +69,16 @@ class RealtimeEngineClass {
   }
 
   public joinBoard(boardId: string) {
+    if (this.currentBoardId && this.currentBoardId !== boardId) {
+      this.leaveBoard();
+    }
+
     this.currentBoardId = boardId;
+    this.yElements.clear();
+    this.undoManager.clear();
+    this.persistentRedoStack = [];
+    useBoardStore.getState().clearBoard();
+    useBoardStore.getState().setBoard(null);
     
     // Set socket auth token
     const token = useAuthStore.getState().token;
@@ -118,6 +127,9 @@ class RealtimeEngineClass {
     this.currentBoardId = null;
     this.yElements.clear();
     this.undoManager.clear();
+    this.persistentRedoStack = [];
+    useBoardStore.getState().clearBoard();
+    useBoardStore.getState().setBoard(null);
     useBoardStore.getState().setSyncStatus('disconnected');
     useBoardStore.getState().updateCollaborators({});
   }
@@ -289,13 +301,15 @@ class RealtimeEngineClass {
   /**
    * Commit a shape to MongoDB and Yjs document
    */
-  public commitElement(type: 'CREATE_ELEMENT' | 'UPDATE_ELEMENT' | 'DELETE_ELEMENT', element: BoardElement) {
+  public commitElement(type: 'CREATE_ELEMENT' | 'UPDATE_ELEMENT' | 'DELETE_ELEMENT', element: BoardElement, origin: string = 'user') {
     // 1. Locally append/mutate inside our Yjs Map immediately (optimistic UI render)
-    if (type === 'CREATE_ELEMENT' || type === 'UPDATE_ELEMENT') {
-      this.yElements.set(element.id, element);
-    } else if (type === 'DELETE_ELEMENT') {
-      this.yElements.delete(element.id);
-    }
+    this.yDoc.transact(() => {
+      if (type === 'CREATE_ELEMENT' || type === 'UPDATE_ELEMENT') {
+        this.yElements.set(element.id, element);
+      } else if (type === 'DELETE_ELEMENT') {
+        this.yElements.delete(element.id);
+      }
+    }, origin);
 
     // 2. Broadcast finalized event to DB
     socket.emit('element:commit', {
@@ -312,18 +326,44 @@ class RealtimeEngineClass {
     socket.emit('board:clear');
   }
 
+  private persistentRedoStack: BoardElement[] = [];
+
+  /* ================= UNDO / REDO ================= */
+
+  public canUndo(): boolean {
+    return this.undoManager.canUndo() || this.yElements.size > 0;
+  }
+
+  public canRedo(): boolean {
+    return this.undoManager.canRedo() || this.persistentRedoStack.length > 0;
+  }
+
   /**
-   * Undo/Redo operations utilizing Yjs history
+   * Undo operations utilizing Yjs history with persistent session fallback
    */
   public undo() {
     if (this.undoManager.canUndo()) {
       this.undoManager.undo();
+    } else {
+      const elements = Array.from(this.yElements.values()) as BoardElement[];
+      if (elements.length > 0) {
+        const lastEl = [...elements].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+        if (lastEl) {
+          this.persistentRedoStack.push(lastEl);
+          this.commitElement('DELETE_ELEMENT', lastEl, 'persistent-undo');
+        }
+      }
     }
   }
 
   public redo() {
     if (this.undoManager.canRedo()) {
       this.undoManager.redo();
+    } else if (this.persistentRedoStack.length > 0) {
+      const restoredEl = this.persistentRedoStack.pop();
+      if (restoredEl) {
+        this.commitElement('CREATE_ELEMENT', restoredEl, 'persistent-undo');
+      }
     }
   }
 
