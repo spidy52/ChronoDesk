@@ -78,7 +78,6 @@ class RealtimeEngineClass {
     this.undoManager.clear();
     this.persistentRedoStack = [];
     useBoardStore.getState().clearBoard();
-    useBoardStore.getState().setBoard(null);
     
     // Set socket auth token
     const token = useAuthStore.getState().token;
