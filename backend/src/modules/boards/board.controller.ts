@@ -90,20 +90,16 @@ export const getOrCreateBoard = async (req: AuthRequest, res: Response) => {
     let board = await Board.findOne({ taskId: new mongoose.Types.ObjectId(taskId) });
 
     if (!board) {
-      if (!title || !workspaceId) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Title and workspaceId are required to create a new board' 
-        });
-      }
-
       board = await Board.create({
-        title,
+        title: task.title || title || 'Whiteboard Workspace',
         taskId: new mongoose.Types.ObjectId(taskId),
-        workspaceId,
+        workspaceId: workspaceId || task.workspaceId,
         createdBy: new mongoose.Types.ObjectId(userId),
       });
       console.log(`Created new board: ${board._id} for task ${taskId}`);
+    } else if (task.title && board.title !== task.title) {
+      board.title = task.title;
+      await board.save();
     }
 
     res.json({ success: true, board });

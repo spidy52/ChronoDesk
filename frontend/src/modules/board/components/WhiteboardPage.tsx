@@ -25,6 +25,7 @@ export default function WhiteboardPage() {
   const navigate = useNavigate();
 
   const { tasks, fetchAllTasks } = useTaskStore();
+  const currentTask = tasks.find((t) => t._id === taskId);
   const {
     board,
     elements,
@@ -188,11 +189,18 @@ export default function WhiteboardPage() {
     const initBoard = async () => {
       if (!taskId) return;
       
-      // 1. Fetch tasks if not loaded to extract workspaceId and name
-      let task = tasks.find((t) => t._id === taskId);
+      // 1. Always fetch fresh tasks to ensure latest title
+      await fetchAllTasks();
+      let task = useTaskStore.getState().tasks.find((t) => t._id === taskId);
       if (!task) {
-        await fetchAllTasks();
-        task = useTaskStore.getState().tasks.find((t) => t._id === taskId);
+        try {
+          const { data: singleTaskRes } = await api.get(`/tasks/${taskId}`);
+          if (singleTaskRes?.task) {
+            task = singleTaskRes.task;
+          }
+        } catch (e) {
+          console.error(e);
+        }
       }
 
       if (!task) {
@@ -1115,7 +1123,7 @@ export default function WhiteboardPage() {
           
           <div>
             <h1 className={`font-bold text-sm md:text-base leading-tight tracking-wide ${isDark ? 'text-zinc-100' : 'text-zinc-900'} flex items-center gap-1.5 md:gap-2 max-w-[100px] sm:max-w-xs md:max-w-none truncate`}>
-              {board?.title || 'Whiteboard Loading...'}
+              {currentTask?.title || board?.title || 'Whiteboard Loading...'}
               {isReplayMode && (
                 <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20 shrink-0">
                   REPLAY REVIEW

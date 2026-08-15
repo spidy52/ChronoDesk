@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import Task from '../../models/Task';
 import Members from '../../models/Member';
 import Workspace from '../../models/Workspace';
+import Board from '../../models/Board';
 
 import {
   AuthRequest,
@@ -148,6 +149,12 @@ export const updateTask =
         .populate('createdBy', 'name email username avatar');
 
       if (updatedTask) {
+        if (req.body.title) {
+          await Board.updateOne(
+            { taskId: updatedTask._id },
+            { title: updatedTask.title }
+          );
+        }
         const userIdsToNotify = new Set<string>();
         
         userIdsToNotify.add(updatedTask.createdBy._id.toString());
