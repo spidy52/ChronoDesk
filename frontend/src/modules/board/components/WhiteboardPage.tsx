@@ -247,7 +247,7 @@ export default function WhiteboardPage() {
       TimelineEngine.clearCache();
       setError(null);
     };
-  }, [taskId, tasks]);
+  }, [taskId]);
 
   // Adjust canvas size dynamically on resize
   useEffect(() => {
