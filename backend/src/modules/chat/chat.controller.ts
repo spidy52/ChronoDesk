@@ -3,6 +3,7 @@ import { AuthRequest } from '../../middleware/auth.middleware';
 import Chat from '../../models/Chat';
 import Message from '../../models/Message';
 import User from '../../models/User';
+import { decryptMessage } from '../../utils/crypto';
 
 export const getChats = async (req: AuthRequest, res: Response) => {
   try {
@@ -16,6 +17,9 @@ export const getChats = async (req: AuthRequest, res: Response) => {
       const counts = chatObj.unreadCounts;
       chatObj.unreadCount = counts instanceof Map ? counts.get(userId) : counts?.[userId!] || 0;
       delete chatObj.unreadCounts;
+      if (chatObj.lastMessage && chatObj.lastMessage.content) {
+        chatObj.lastMessage.content = decryptMessage(chatObj.lastMessage.content);
+      }
       return chatObj;
     });
 
@@ -28,7 +32,12 @@ export const getChats = async (req: AuthRequest, res: Response) => {
 export const getMessages = async (req: AuthRequest, res: Response) => {
   try {
     const { chatId } = req.params;
-    const messages = await Message.find({ chatId }).sort({ createdAt: 1 });
+    const rawMessages = await Message.find({ chatId }).sort({ createdAt: 1 });
+    const messages = rawMessages.map((m) => {
+      const obj: any = m.toObject();
+      obj.content = decryptMessage(obj.content);
+      return obj;
+    });
     res.json({ success: true, messages });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Internal server error' });

@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import Chat from '../models/Chat';
 import Message from '../models/Message';
+import { encryptMessage, decryptMessage } from '../utils/crypto';
 
 export default function setupChatSocket(io: Server, socket: Socket) {
   socket.on('message:send', async (data, callback) => {
@@ -13,14 +14,16 @@ export default function setupChatSocket(io: Server, socket: Socket) {
         return;
       }
       
+      const encryptedContent = encryptMessage(content);
+
       const message = await Message.create({
         chatId,
         senderId,
-        content,
+        content: encryptedContent,
       });
       
       chat.lastMessage = {
-        content,
+        content: encryptedContent,
         senderId,
         createdAt: message.createdAt,
         readAt: null,
@@ -36,11 +39,16 @@ export default function setupChatSocket(io: Server, socket: Socket) {
       
       await chat.save();
       
+      const decryptedMessagePayload = {
+        ...message.toObject(),
+        content: content,
+      };
+
       for (const p of otherParticipants) {
-        io.to(p.toString()).emit('message:received', message);
+        io.to(p.toString()).emit('message:received', decryptedMessagePayload);
       }
       
-      if (callback) callback({ success: true, message });
+      if (callback) callback({ success: true, message: decryptedMessagePayload });
     } catch (error) {
       console.error('Socket message:send error:', error);
       if (callback) callback({ success: false, error: 'Failed to send message' });

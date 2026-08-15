@@ -6,6 +6,9 @@ import Task from '../../models/Task';
 import Members from '../../models/Member';
 import Workspace from '../../models/Workspace';
 import Board from '../../models/Board';
+import BoardEvent from '../../models/BoardEvent';
+import BoardSnapshot from '../../models/BoardSnapshot';
+import TimelineFrame from '../../models/TimelineFrame';
 
 import {
   AuthRequest,
@@ -213,6 +216,15 @@ export const deleteTask =
       });
 
       if (deletedTask) {
+        // Cascade delete associated Whiteboard, events, snapshots, and timeline frames
+        const board = await Board.findOneAndDelete({ taskId: deletedTask._id });
+        if (board) {
+          await BoardEvent.deleteMany({ boardId: board._id });
+          await BoardSnapshot.deleteMany({ boardId: board._id });
+          await TimelineFrame.deleteMany({ boardId: board._id });
+          console.log(`Cascade deleted Whiteboard ${board._id} and all events for task ${deletedTask._id}`);
+        }
+
         const userIdsToNotify = new Set<string>();
         
         userIdsToNotify.add(deletedTask.createdBy.toString());

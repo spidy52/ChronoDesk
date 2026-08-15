@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { encryptMessage } from '../utils/crypto';
 
 const messageSchema = new mongoose.Schema(
   {
@@ -29,5 +30,13 @@ const messageSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+messageSchema.pre('save', function (this: any) {
+  if (this.isModified('content') && this.content) {
+    if (!this.content.startsWith('enc:')) {
+      this.content = encryptMessage(this.content);
+    }
+  }
+});
 
 export default mongoose.model('Message', messageSchema);
