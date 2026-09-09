@@ -29,7 +29,7 @@ class RealtimeEngineClass {
     this.yDoc = new Y.Doc();
     this.yElements = this.yDoc.getMap('elements');
     this.undoManager = new Y.UndoManager(this.yElements, {
-      trackedOrigins: new Set([null, undefined]),
+      trackedOrigins: new Set([null, undefined, 'user']),
     });
 
     // Watch Yjs Map changes to update our Zustand local store
