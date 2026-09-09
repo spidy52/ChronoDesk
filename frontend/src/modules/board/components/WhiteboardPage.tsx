@@ -105,6 +105,17 @@ export default function WhiteboardPage() {
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight - 200 });
   const [showTimeline, setShowTimeline] = useState(() => window.innerWidth >= 768);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  const handleToggleTimeline = () => {
+    if (showTimeline && isReplayMode) {
+      TimelineEngine.stopPlayback();
+      useBoardStore.getState().setReplayMode(false);
+      const liveEls = Array.from(RealtimeEngine.yElements.values()) as BoardElement[];
+      useBoardStore.getState().setElements(liveEls);
+    }
+    setShowTimeline((prev) => !prev);
+  };
+
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [lastTouchDist, setLastTouchDist] = useState<number | null>(null);
@@ -1210,7 +1221,7 @@ export default function WhiteboardPage() {
           {/* Exports drop downs (Desktop) */}
           <div className="hidden md:flex items-center gap-2">
             <button
-              onClick={() => setShowTimeline(!showTimeline)}
+              onClick={handleToggleTimeline}
               className={`px-3 py-1.5 text-xs rounded-xl border ${showTimeline ? (isDark ? 'bg-blue-600/20 border-blue-500/30 text-blue-400' : 'bg-blue-50 border-blue-200 text-blue-600') : (isDark ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white' : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-700 hover:text-black')} font-bold flex items-center gap-1.5 transition-all shadow-md active:scale-95`}
               title={showTimeline ? "Hide Timeline Scrubber" : "Show Timeline Scrubber"}
             >
@@ -1247,7 +1258,7 @@ export default function WhiteboardPage() {
               <div className={`absolute right-0 top-full mt-1.5 flex flex-col gap-1 p-2 rounded-xl border shadow-xl z-50 ${isDark ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-zinc-200'} text-xs font-semibold w-40`}>
                 <button
                   onClick={() => {
-                    setShowTimeline(!showTimeline);
+                    handleToggleTimeline();
                     setShowMobileMenu(false);
                   }}
                   className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 ${isDark ? 'hover:bg-zinc-900 text-zinc-300' : 'hover:bg-zinc-100 text-zinc-700'}`}

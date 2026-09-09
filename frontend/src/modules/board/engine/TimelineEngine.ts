@@ -33,7 +33,7 @@ class TimelineEngineClass {
         this.hasLoadedAllData = true;
 
         // Dynamically adjust boardStartTime to match "when i started using the board"
-        const { setTimelineBounds, boardEndTime, board } = useBoardStore.getState();
+        const { setTimelineBounds, board } = useBoardStore.getState();
         const times = this.allEvents.map((e) => e.timestamp);
         
         // Also check if there are timeline frames
@@ -42,12 +42,13 @@ class TimelineEngineClass {
 
         if (times.length > 0) {
           const earliestTime = Math.min(...times);
-          setTimelineBounds(earliestTime, boardEndTime);
-          useBoardStore.getState().setReplayTime(earliestTime);
+          const latestTime = Math.max(...times, Date.now());
+          setTimelineBounds(earliestTime, latestTime);
+          useBoardStore.getState().setReplayTime(latestTime);
         } else if (board) {
           const sessionStart = Date.now();
           setTimelineBounds(sessionStart, sessionStart + 1000);
-          useBoardStore.getState().setReplayTime(sessionStart);
+          useBoardStore.getState().setReplayTime(sessionStart + 1000);
         }
       }
     } catch (err) {

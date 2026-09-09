@@ -145,6 +145,9 @@ class RealtimeEngineClass {
           }
         });
       }, 'initial-load');
+
+      const currentEls = Array.from(this.yElements.values()) as BoardElement[];
+      useBoardStore.getState().setElements(currentEls);
     } catch (err) {
       console.error('Failed to load initial board elements from DB:', err);
     }
