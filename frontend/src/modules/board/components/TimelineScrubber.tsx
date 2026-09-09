@@ -185,17 +185,20 @@ export default function TimelineScrubber({ boardId, onScrubRelease }: TimelineSc
     };
   }, [isDragging, replayTime, boardId, onScrubRelease, setElements]);
 
-  // Keep boardEndTime updated in real-time when in live mode
+  const syncStatus = useBoardStore((state) => state.syncStatus);
+
+  // Keep boardEndTime updated in real-time ONLY when actively connected in live mode
   useEffect(() => {
-    if (isReplayMode) return;
+    if (isReplayMode || syncStatus !== 'connected') return;
 
     const interval = setInterval(() => {
-      const { setTimelineBounds, boardStartTime } = useBoardStore.getState();
-      setTimelineBounds(boardStartTime, Date.now());
+      const { setTimelineBounds, boardStartTime, boardEndTime } = useBoardStore.getState();
+      const nextEnd = Math.max(boardEndTime + 1000, Date.now());
+      setTimelineBounds(boardStartTime, nextEnd);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isReplayMode]);
+  }, [isReplayMode, syncStatus]);
 
   // Hovering tooltip handler
   const handleMouseMoveHover = (e: React.MouseEvent) => {
@@ -225,10 +228,22 @@ export default function TimelineScrubber({ boardId, onScrubRelease }: TimelineSc
     }
   };
 
-  // Format dates for labels
-  const formatTime = (ms: number) => {
-    const date = new Date(ms);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  // Format video player timeline offset (e.g. 00:00 / 03:45)
+  const formatVideoTime = (currentMs: number, startMs: number) => {
+    const elapsedSeconds = Math.max(0, Math.floor((currentMs - startMs) / 1000));
+    const totalSeconds = Math.max(0, Math.floor((boardEndTime - boardStartTime) / 1000));
+    const showHours = totalSeconds >= 3600;
+
+    const hours = Math.floor(elapsedSeconds / 3600);
+    const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+    const seconds = elapsedSeconds % 60;
+
+    const pad = (num: number) => num.toString().padStart(2, '0');
+
+    if (showHours) {
+      return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+    return `${pad(minutes)}:${pad(seconds)}`;
   };
 
   return (
@@ -275,9 +290,9 @@ export default function TimelineScrubber({ boardId, onScrubRelease }: TimelineSc
 
         {/* Time display indicator */}
         <div className={`font-mono text-xs flex items-center gap-2 ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-          <span className="text-blue-500 font-bold">{formatTime(replayTime)}</span>
+          <span className="text-blue-500 font-bold">{formatVideoTime(replayTime, boardStartTime)}</span>
           <span className={isDark ? 'text-zinc-600' : 'text-zinc-400'}>/</span>
-          <span>{formatTime(boardEndTime)}</span>
+          <span>{formatVideoTime(boardEndTime, boardStartTime)}</span>
         </div>
 
         {/* Modes Toggle */}
@@ -358,7 +373,7 @@ export default function TimelineScrubber({ boardId, onScrubRelease }: TimelineSc
               />
             )}
             <div className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${isDark ? 'text-zinc-300 bg-zinc-950' : 'text-zinc-600 bg-zinc-100'}`}>
-              {formatTime(hoverTime)}
+              {formatVideoTime(hoverTime, boardStartTime)}
             </div>
             <div className={`w-2 h-2 border-r border-b rotate-45 -mt-2 ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}></div>
           </div>
@@ -366,9 +381,9 @@ export default function TimelineScrubber({ boardId, onScrubRelease }: TimelineSc
 
         {/* Timestamps ticks */}
         <div className={`absolute bottom-0 left-0 right-0 h-4 pointer-events-none flex justify-between px-3 text-[9px] font-mono items-center border-t ${isDark ? 'bg-zinc-900/60 text-zinc-500 border-zinc-800/40' : 'bg-zinc-50/80 text-zinc-400 border-zinc-200'}`}>
-          <span>{formatTime(boardStartTime)}</span>
-          <span>{formatTime(boardStartTime + totalDuration / 2)}</span>
-          <span>{formatTime(boardEndTime)}</span>
+          <span>00:00</span>
+          <span>{formatVideoTime(boardStartTime + totalDuration / 2, boardStartTime)}</span>
+          <span>{formatVideoTime(boardEndTime, boardStartTime)}</span>
         </div>
       </div>
     </div>

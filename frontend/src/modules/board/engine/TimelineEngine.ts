@@ -42,9 +42,10 @@ class TimelineEngineClass {
 
         if (times.length > 0) {
           const earliestTime = Math.min(...times);
-          const latestTime = Math.max(...times, Date.now());
-          setTimelineBounds(earliestTime, latestTime);
-          useBoardStore.getState().setReplayTime(latestTime);
+          const latestEventTime = Math.max(...times);
+          const initialEnd = Math.max(latestEventTime, earliestTime + 1000);
+          setTimelineBounds(earliestTime, initialEnd);
+          useBoardStore.getState().setReplayTime(initialEnd);
         } else if (board) {
           const sessionStart = Date.now();
           setTimelineBounds(sessionStart, sessionStart + 1000);
